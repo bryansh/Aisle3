@@ -1,6 +1,6 @@
 {
   "name": "aisle3",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "",
   "type": "module",
   "scripts": {
@@ -12,7 +12,7 @@
     "tauri": "tauri",
     "release": "node scripts/release.cjs",
     "release:patch": "node scripts/release.cjs patch",
-    "release:minor": "node scripts/release.cjs minor", 
+    "release:minor": "node scripts/release.cjs minor",
     "release:major": "node scripts/release.cjs major"
   },
   "license": "MIT",
