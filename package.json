@@ -10,7 +10,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch",
     "tauri": "tauri",
-    "release": "node scripts/release.js",
+    "release": "node scripts/release.cjs",
     "release:patch": "node scripts/release.cjs patch",
     "release:minor": "node scripts/release.cjs minor", 
     "release:major": "node scripts/release.cjs major"
