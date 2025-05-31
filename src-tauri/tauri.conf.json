@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Gmail Client",
+        "title": "Aisle 3",
         "width": 1200,
         "height": 800,
         "minWidth": 800,
@@ -40,7 +40,7 @@
     "updater": {
       "active": true,
       "endpoints": [
-        "https://github.com/yourusername/gmail-client/releases/latest/download"
+          "https://github.com/bryansh/Aisle3/releases/latest/download"
       ],
       "dialog": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhEQUFFQUQ5NkE2QzFFODcKUldUK0FnVmhFUmdrRlFTc0JMWmZOTUJoVkVSQ2VkZWZVK3lsZmwvUmRKYUhQemJUdGtrVXBZVmcK"
