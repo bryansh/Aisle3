@@ -1,6 +1,6 @@
 [package]
 name = "aisle3"
-version = "0.2.0"
+version = "0.2.1"
 description = "A Gmail Client for Inbox Management"
 authors = ["bryansh"]
 edition = "2021"
