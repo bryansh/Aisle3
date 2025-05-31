@@ -45,7 +45,7 @@ jobs:
       - uses: tauri-apps/tauri-action@v0.5.14
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Aisle3 v__VERSION__'
@@ -73,7 +73,7 @@ jobs:
       - name: Wait for release to be complete
         run: |
           echo "Waiting for release assets to be available..."
-          sleep 60
+          sleep 120
 
       - name: Download release assets
         env:
