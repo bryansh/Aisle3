@@ -11,9 +11,9 @@
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json --watch",
     "tauri": "tauri",
     "release": "node scripts/release.js",
-    "release:patch": "node scripts/release.js patch",
-    "release:minor": "node scripts/release.js minor", 
-    "release:major": "node scripts/release.js major"
+    "release:patch": "node scripts/release.cjs patch",
+    "release:minor": "node scripts/release.cjs minor", 
+    "release:major": "node scripts/release.cjs major"
   },
   "license": "MIT",
   "dependencies": {
