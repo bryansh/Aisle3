@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Aisle3",
-  "version": "0.1.0",
+  "version": "0.1.5",
   "identifier": "com.aisle3.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -28,6 +28,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -40,10 +41,10 @@
     "updater": {
       "active": true,
       "endpoints": [
-          "https://github.com/bryansh/Aisle3/releases/latest/download"
+        "https://bryansh.github.io/aisle3-updates/latest.json"
       ],
       "dialog": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhEQUFFQUQ5NkE2QzFFODcKUldUK0FnVmhFUmdrRlFTc0JMWmZOTUJoVkVSQ2VkZWZVK3lsZmwvUmRKYUhQemJUdGtrVXBZVmcK"
+      "pubkey": "RWQTAZz99l+9Ahr41kbDcHZUNv52WNhKH25j6l3HuqRU+QllNREXT11u"
     }
   }
 }

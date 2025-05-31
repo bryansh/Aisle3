@@ -14,6 +14,50 @@ struct Email {
 }
 
 #[tauri::command]
+async fn install_update(app: tauri::AppHandle) -> Result<String, String> {
+    println!("Install update called");
+    
+    let updater = app.updater().map_err(|e| {
+        println!("Updater error: {}", e);
+        format!("Updater not available: {}", e)
+    })?;
+    
+    println!("Checking for updates...");
+    match updater.check().await {
+        Ok(Some(update)) => {
+            println!("Update found, attempting to download and install...");
+            
+            let on_chunk = |chunk_length: usize, content_length: Option<u64>| {
+                println!("Downloaded chunk: {} bytes, total: {:?}", chunk_length, content_length);
+            };
+            
+            let on_download_finish = || {
+                println!("Update download completed!");
+            };
+            
+            match update.download_and_install(on_chunk, on_download_finish).await {
+                Ok(_) => {
+                    println!("Update installed successfully!");
+                    Ok("Update installed successfully! Please restart the app.".to_string())
+                },
+                Err(e) => {
+                    println!("Install error: {}", e);
+                    Err(format!("Failed to install update: {}", e))
+                }
+            }
+        }
+        Ok(None) => {
+            println!("No update found during install");
+            Err("No update available".to_string())
+        },
+        Err(e) => {
+            println!("Check error: {}", e);
+            Err(format!("Failed to check for updates: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
 async fn get_emails() -> Result<Vec<Email>, String> {
     let mut emails = Vec::new();
     
@@ -52,7 +96,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             get_emails, 
             get_inbox_stats, 
-            check_for_updates
+            check_for_updates,
+            install_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
