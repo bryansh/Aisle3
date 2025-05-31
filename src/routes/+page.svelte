@@ -46,12 +46,12 @@
 </script>
 
 <svelte:head>
-  <title>Gmail Client</title>
+  <title>Aisle 3</title>
 </svelte:head>
 
 <div class="app">
   <header class="header">
-    <h1>📧 Gmail Client</h1>
+    <h1>📧 Aisle 3</h1>
     <div class="header-controls">
       <div class="stats">
         <span class="stat total">Total: {totalCount}</span>

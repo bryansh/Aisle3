@@ -1,8 +1,8 @@
 [package]
-name = "gmail-client"
+name = "aisle3"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "A Gmail Client for Inbox Management"
+authors = ["bryansh"]
 edition = "2021"
 
 [build-dependencies]
