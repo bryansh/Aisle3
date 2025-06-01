@@ -1,8 +1,24 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod gmail_auth;
+mod gmail_client;
+mod gmail_config;
+
+use gmail_auth::{GmailAuth, AuthTokens, parse_callback_url};
+use gmail_client::{GmailClient, GmailMessage};
 use serde::{Deserialize, Serialize};
+use serde_json;
+use std::fs;
+use std::path::PathBuf;
+use std::sync::Mutex;
+use tauri::State;
 use tauri_plugin_updater::UpdaterExt;
+
+struct AppState {
+    gmail_auth: Mutex<Option<GmailAuth>>,
+    auth_tokens: Mutex<Option<AuthTokens>>,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Email {
@@ -58,25 +74,90 @@ async fn install_update(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn get_emails() -> Result<Vec<Email>, String> {
-    let mut emails = Vec::new();
+async fn get_emails(state: State<'_, AppState>) -> Result<Vec<Email>, String> {
+    // This will either return valid tokens or an error
+    let tokens = match refresh_tokens_if_needed(&state).await {
+        Ok(tokens) => tokens,
+        Err(_) => {
+            // Return mock data if not authenticated or refresh failed
+            let mut emails = Vec::new();
+            for i in 1..=20 {
+                emails.push(Email {
+                    id: format!("email_{}", i),
+                    subject: format!("Email Subject {}", i),
+                    sender: format!("sender{}@example.com", i),
+                    snippet: "This is a preview of the email content...".to_string(),
+                    is_read: i % 2 == 0,
+                });
+            }
+            return Ok(emails);
+        }
+    };
+
+    // Create Gmail client and fetch real emails using the refreshed tokens
+    let gmail_client = GmailClient::new(&tokens);
     
-    for i in 1..=20 {
-        emails.push(Email {
-            id: format!("email_{}", i),
-            subject: format!("Email Subject {}", i),
-            sender: format!("sender{}@example.com", i),
-            snippet: "This is a preview of the email content...".to_string(),
-            is_read: i % 2 == 0,
-        });
-    }
-    
+    // List messages (get first 20)
+    let response = gmail_client
+        .list_messages(Some(20), None, None)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let message_ids: Vec<String> = response
+        .messages
+        .unwrap_or_default()
+        .into_iter()
+        .map(|m| m.id)
+        .collect();
+
+    // Fetch full message details
+    let gmail_messages = gmail_client
+        .get_messages_batch(&message_ids)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Convert to our Email format
+    let emails: Vec<Email> = gmail_messages
+        .into_iter()
+        .map(|msg| Email {
+            id: msg.id.clone(),
+            subject: msg.get_subject(),
+            sender: msg.get_from(),
+            snippet: msg.snippet.clone(),
+            is_read: !msg.is_unread(),
+        })
+        .collect();
+
     Ok(emails)
 }
 
+
 #[tauri::command]
-async fn get_inbox_stats() -> Result<(u32, u32), String> {
-    Ok((6303, 3151))
+async fn get_inbox_stats(state: State<'_, AppState>) -> Result<(u32, u32), String> {
+    // This will either return valid tokens or an error
+    let tokens = match refresh_tokens_if_needed(&state).await {
+        Ok(tokens) => tokens,
+        Err(_) => return Ok((6303, 3151)), // Return mock data if not authenticated or refresh failed
+    };
+
+    // Create Gmail client and get profile using the refreshed tokens
+    let gmail_client = GmailClient::new(&tokens);
+    
+    match gmail_client.get_profile().await {
+        Ok(profile) => {
+            let total = profile.messages_total.unwrap_or(0);
+            
+            // Get unread count by querying unread messages
+            match gmail_client.list_messages(Some(1), None, Some("is:unread")).await {
+                Ok(unread_response) => {
+                    let unread = unread_response.result_size_estimate.unwrap_or(0);
+                    Ok((total, unread))
+                }
+                Err(_) => Ok((total, 0))
+            }
+        }
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 #[tauri::command]
@@ -90,14 +171,185 @@ async fn check_for_updates(app: tauri::AppHandle) -> Result<String, String> {
     }
 }
 
+#[tauri::command]
+async fn start_gmail_auth(state: State<'_, AppState>) -> Result<String, String> {
+    let mut gmail_auth = GmailAuth::new().map_err(|e| e.to_string())?;
+    let auth_url = gmail_auth.get_auth_url().map_err(|e| e.to_string())?;
+    
+    // Store the auth instance
+    *state.gmail_auth.lock().unwrap() = Some(gmail_auth);
+    
+    Ok(auth_url)
+}
+
+#[tauri::command]
+async fn get_email_content(
+    email_id: String,
+    state: State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    // Check if we have auth tokens
+    let tokens = {
+        let tokens_guard = state.auth_tokens.lock().unwrap();
+        tokens_guard.clone()
+    };
+
+    let tokens = match tokens {
+        Some(tokens) => tokens,
+        None => return Err("Not authenticated".to_string()),
+    };
+
+    // Create Gmail client and fetch the specific email
+    let gmail_client = GmailClient::new(&tokens);
+    
+    let message = gmail_client
+        .get_message(&email_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Create a processed response with all the fields we need
+    let processed_email = serde_json::json!({
+        "id": message.id,
+        "subject": message.get_subject(),
+        "sender": message.get_from(),
+        "date": message.get_date(),
+        "body_text": message.get_body_text(),
+        "body_html": message.get_body_html(),
+        "snippet": message.snippet,
+        "is_unread": message.is_unread()
+    });
+
+    Ok(processed_email)
+}
+
+#[tauri::command]
+async fn complete_gmail_auth(
+    callback_url: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    // Parse the callback URL
+    let (code, _state) = parse_callback_url(&callback_url).map_err(|e| e.to_string())?;
+    
+    // Clone the auth instance to avoid holding the lock across await
+    let gmail_auth = {
+        let auth_guard = state.gmail_auth.lock().unwrap();
+        auth_guard.as_ref().ok_or("No auth session found")?.clone()
+    };
+    
+    // Exchange code for tokens (now we don't hold the lock)
+    let tokens = gmail_auth.exchange_code(&code).await.map_err(|e| e.to_string())?;
+    
+    // Store tokens
+    *state.auth_tokens.lock().unwrap() = Some(tokens.clone());
+
+    // Save tokens to disk for persistence
+    save_tokens(&tokens).map_err(|e| format!("Failed to save tokens: {}", e))?;
+    
+    Ok("Authentication successful!".to_string())
+}
+
+#[tauri::command]
+async fn logout_gmail(state: State<'_, AppState>) -> Result<String, String> {
+    *state.auth_tokens.lock().unwrap() = None;
+    
+    // Delete saved tokens
+    let token_file = get_token_file_path();
+    if token_file.exists() {
+        std::fs::remove_file(token_file).map_err(|e| e.to_string())?;
+    }
+    
+    Ok("Logged out successfully".to_string())
+}
+
+#[tauri::command]
+async fn get_auth_status(state: State<'_, AppState>) -> Result<bool, String> {
+    let tokens = state.auth_tokens.lock().unwrap();
+    Ok(tokens.is_some())
+}
+
+#[tauri::command]
+async fn open_url(url: String) -> Result<(), String> {
+    opener::open(&url).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn get_token_file_path() -> PathBuf {
+    let mut path = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
+    path.push("aisle3");
+    std::fs::create_dir_all(&path).ok();
+    path.push("tokens.json");
+    path
+}
+
+fn save_tokens(tokens: &AuthTokens) -> Result<(), Box<dyn std::error::Error>> {
+    let token_file = get_token_file_path();
+    let json = serde_json::to_string(tokens)?;
+    fs::write(token_file, json)?;
+    Ok(())
+}
+
+fn load_tokens() -> Option<AuthTokens> {
+    let token_file = get_token_file_path();
+    if token_file.exists() {
+        if let Ok(json) = fs::read_to_string(token_file) {
+            return serde_json::from_str(&json).ok();
+        }
+    }
+    None
+}
+
+async fn refresh_tokens_if_needed(state: &State<'_, AppState>) -> Result<AuthTokens, String> {
+    let tokens = {
+        let tokens_guard = state.auth_tokens.lock().unwrap();
+        tokens_guard.clone()
+    };
+
+    let tokens = tokens.ok_or("Not authenticated")?;
+
+    // Try to use the current tokens first
+    let gmail_client = GmailClient::new(&tokens);
+    
+    // Test if tokens work by trying to get profile
+    match gmail_client.get_profile().await {
+        Ok(_) => Ok(tokens), // Tokens work fine
+        Err(_) => {
+            // Tokens expired, try to refresh
+            if let Some(refresh_token) = &tokens.refresh_token {
+                let gmail_auth = GmailAuth::new().map_err(|e| e.to_string())?;
+                let new_tokens = gmail_auth.refresh_access_token(refresh_token).await.map_err(|e| e.to_string())?;
+                
+                // Store the new tokens
+                *state.auth_tokens.lock().unwrap() = Some(new_tokens.clone());
+                save_tokens(&new_tokens).map_err(|e| format!("Failed to save tokens: {}", e))?;
+                
+                Ok(new_tokens)
+            } else {
+                Err("No refresh token available".to_string())
+            }
+        }
+    }
+}
+
 fn main() {
+    // Load saved tokens on startup
+    let saved_tokens = load_tokens();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(AppState {
+            gmail_auth: Mutex::new(None),
+            auth_tokens: Mutex::new(saved_tokens), // Use saved tokens instead of None
+        })
         .invoke_handler(tauri::generate_handler![
             get_emails, 
             get_inbox_stats, 
             check_for_updates,
-            install_update
+            install_update,
+            start_gmail_auth,
+            complete_gmail_auth,
+            get_auth_status,
+            open_url,
+            logout_gmail,
+            get_email_content
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
