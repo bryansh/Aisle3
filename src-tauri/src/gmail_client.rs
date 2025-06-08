@@ -170,10 +170,95 @@ impl GmailClient {
         &self, 
         message_ids: &[String]
     ) -> Result<Vec<GmailMessage>, Box<dyn std::error::Error + Send + Sync>> {
+        // Use Gmail's batch API for better performance
+        if message_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Gmail batch API has a limit of 100 requests per batch
+        let batch_size = std::cmp::min(message_ids.len(), 100);
+        let message_ids_batch = &message_ids[..batch_size];
+        
+        let boundary = "batch_boundary_aisle3";
+        let mut batch_body = String::new();
+        
+        // Build multipart/mixed batch request
+        for (i, message_id) in message_ids_batch.iter().enumerate() {
+            batch_body.push_str(&format!("--{}\r\n", boundary));
+            batch_body.push_str("Content-Type: application/http\r\n");
+            batch_body.push_str(&format!("Content-ID: <item{}>\r\n\r\n", i));
+            batch_body.push_str(&format!("GET /gmail/v1/users/me/messages/{}?format=full HTTP/1.1\r\n", message_id));
+            batch_body.push_str("Host: gmail.googleapis.com\r\n\r\n");
+        }
+        batch_body.push_str(&format!("--{}--\r\n", boundary));
+
+        let url = "https://gmail.googleapis.com/batch/gmail/v1";
+        let response = self.client
+            .post(url)
+            .bearer_auth(&self.access_token)
+            .header("Content-Type", format!("multipart/mixed; boundary={}", boundary))
+            .body(batch_body)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await?;
+            println!("Gmail Batch API error response: {}", error_text);
+            return Err(format!("Gmail Batch API error: {}", error_text).into());
+        }
+
+        let response_text = response.text().await?;
+        
+        // Parse batch response - Gmail uses different boundary format in response
         let mut messages = Vec::new();
         
-        // Gmail API allows batch requests, but for simplicity we'll do individual requests
-        // In production, you'd want to use the batch API for better performance
+        // Gmail generates its own boundary in the response, extract it from the first boundary marker
+        let response_boundary = if let Some(first_boundary_pos) = response_text.find("--batch_") {
+            // Extract just the boundary name (without --)
+            let boundary_start = first_boundary_pos + 2; // Skip the --
+            if let Some(boundary_end) = response_text[boundary_start..].find('\n') {
+                &response_text[boundary_start..boundary_start + boundary_end]
+            } else {
+                boundary // Fallback to our boundary
+            }
+        } else {
+            boundary
+        };
+        
+        let parts: Vec<&str> = response_text.split(&format!("--{}", response_boundary)).collect();
+        
+        for part in parts.iter().skip(1) { // Skip the first empty part
+            if part.contains("--") && part.len() < 10 {
+                continue; // Skip the final boundary marker
+            }
+            
+            // Find the JSON content in each part
+            if let Some(json_start) = part.find('{') {
+                if let Some(json_end) = part.rfind('}') {
+                    let json_content = &part[json_start..=json_end];
+                    
+                    if let Ok(message) = serde_json::from_str::<GmailMessage>(json_content) {
+                        messages.push(message);
+                    }
+                }
+            }
+        }
+        
+        // If batch API fails, fallback to individual requests
+        if messages.is_empty() && !message_ids_batch.is_empty() {
+            return self.get_messages_individual(message_ids_batch).await;
+        }
+        
+        Ok(messages)
+    }
+
+    // Fallback method for individual requests
+    async fn get_messages_individual(
+        &self, 
+        message_ids: &[String]
+    ) -> Result<Vec<GmailMessage>, Box<dyn std::error::Error + Send + Sync>> {
+        let mut messages = Vec::new();
+        
         for message_id in message_ids.iter().take(20) { // Limit to 20 for now
             match self.get_message(message_id).await {
                 Ok(message) => messages.push(message),

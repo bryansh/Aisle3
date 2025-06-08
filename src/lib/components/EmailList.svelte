@@ -16,37 +16,26 @@
   interface Props {
     emails?: Email[];
     onEmailSelect: (email: Email) => void;
-    onMarkAsRead: (emailId: string) => void;
-    onMarkAsUnread: (emailId: string) => void;
+    onMarkAsRead: (emailId: string) => Promise<void>;
+    onMarkAsUnread: (emailId: string) => Promise<void>;
+    loadingEmailStates: Set<string>;
   }
 
   let { 
     emails = [], 
     onEmailSelect,
     onMarkAsRead,
-    onMarkAsUnread
+    onMarkAsUnread,
+    loadingEmailStates
   }: Props = $props();
-
-  // Track loading state for each email
-  let loadingEmails = $state(new Set<string>());
 
   const handleToggleReadStatus = async (event: Event, email: Email) => {
     event.stopPropagation(); // Prevent email selection
     
-    // Add to loading set
-    loadingEmails.add(email.id);
-    loadingEmails = new Set(loadingEmails); // Trigger reactivity
-    
-    try {
-      if (email.is_read) {
-        await onMarkAsUnread(email.id);
-      } else {
-        await onMarkAsRead(email.id);
-      }
-    } finally {
-      // Remove from loading set
-      loadingEmails.delete(email.id);
-      loadingEmails = new Set(loadingEmails); // Trigger reactivity
+    if (email.is_read) {
+      await onMarkAsUnread(email.id);
+    } else {
+      await onMarkAsRead(email.id);
     }
   };
 </script>
@@ -61,8 +50,8 @@
   <div in:fade={{ duration: 500, delay: 300 }}>
     <div class="space-y-3">
       {#each emails as email}
-        <!-- svelte-ignore a11y-click-events-have-key-events -->
-        <!-- svelte-ignore a11y-no-static-element-interactions -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div 
           class="cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-blue-300 transform hover:-translate-y-1 {!email.is_read ? 'border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-50 to-white' : 'bg-white hover:bg-gray-50'} rounded-lg border border-gray-200 shadow-sm"
           onclick={() => onEmailSelect(email)}
@@ -85,11 +74,11 @@
                   size="xs"
                   color="light"
                   onclick={(event) => handleToggleReadStatus(event, email)}
-                  disabled={loadingEmails.has(email.id)}
+                  disabled={loadingEmailStates.has(email.id)}
                   class="p-1"
                   title={email.is_read ? 'Mark as unread' : 'Mark as read'}
                 >
-                  {#if loadingEmails.has(email.id)}
+                  {#if loadingEmailStates.has(email.id)}
                     <div class="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
                   {:else if email.is_read}
                     <MailX class="w-4 h-4" />
