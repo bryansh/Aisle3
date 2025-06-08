@@ -24,6 +24,7 @@ struct AppState {
 #[derive(Debug, Serialize, Deserialize)]
 struct Email {
     id: String,
+    thread_id: String,
     subject: String,
     sender: String,
     snippet: String,
@@ -85,6 +86,7 @@ async fn get_emails(state: State<'_, AppState>) -> Result<Vec<Email>, String> {
             for i in 1..=20 {
                 emails.push(Email {
                     id: format!("email_{}", i),
+                    thread_id: format!("thread_{}", (i - 1) / 3 + 1), // Group every 3 emails into a thread
                     subject: format!("Email Subject {}", i),
                     sender: format!("sender{}@example.com", i),
                     snippet: "This is a preview of the email content...".to_string(),
@@ -104,12 +106,14 @@ async fn get_emails(state: State<'_, AppState>) -> Result<Vec<Email>, String> {
         .await
         .map_err(|e| e.to_string())?;
 
-    let message_ids: Vec<String> = response
+    let message_refs: Vec<(String, String)> = response
         .messages
         .unwrap_or_default()
         .into_iter()
-        .map(|m| m.id)
+        .map(|m| (m.id, m.thread_id))
         .collect();
+
+    let message_ids: Vec<String> = message_refs.iter().map(|(id, _)| id.clone()).collect();
 
     // Fetch full message details
     let gmail_messages = gmail_client
@@ -120,12 +124,21 @@ async fn get_emails(state: State<'_, AppState>) -> Result<Vec<Email>, String> {
     // Convert to our Email format
     let emails: Vec<Email> = gmail_messages
         .into_iter()
-        .map(|msg| Email {
-            id: msg.id.clone(),
-            subject: msg.get_subject(),
-            sender: msg.get_from(),
-            snippet: msg.snippet.clone(),
-            is_read: !msg.is_unread(),
+        .map(|msg| {
+            let thread_id = message_refs
+                .iter()
+                .find(|(id, _)| *id == msg.id)
+                .map(|(_, thread_id)| thread_id.clone())
+                .unwrap_or_else(|| msg.id.clone()); // Fallback to message id if not found
+            
+            Email {
+                id: msg.id.clone(),
+                thread_id,
+                subject: msg.get_subject(),
+                sender: msg.get_from(),
+                snippet: msg.snippet.clone(),
+                is_read: !msg.is_unread(),
+            }
         })
         .collect();
 

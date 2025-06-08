@@ -7,10 +7,13 @@
   import EmailViewer from '$lib/components/EmailViewer.svelte';
   import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
   import Settings from '$lib/components/Settings.svelte';
+  import ConversationList from '$lib/components/ConversationList.svelte';
   import DOMPurify from 'dompurify';
+  import { decode } from 'he';
 
   interface Email {
     id: string;
+    thread_id: string;
     subject: string;
     sender: string;
     snippet: string;
@@ -37,6 +40,91 @@
   let showSettings = $state(false);
   let selectedEmail = $state<EmailContent | null>(null);
   let loadingEmail = $state(false);
+  let viewMode = $state<'emails' | 'conversations'>('emails');
+  let selectedConversation = $state<Conversation | null>(null);
+  
+  // Conversation interface
+  interface Conversation {
+    thread_id: string;
+    subject: string;
+    sender: string;
+    snippet: string;
+    message_count: number;
+    has_unread: boolean;
+    latest_date: string;
+    emails: Email[];
+  }
+  
+  // Settings for conversation view
+  let showSingleMessageThreads = $state(false);
+  
+  // Function to calculate conversations
+  function calculateConversations() {
+    if (viewMode !== 'conversations') return [];
+    
+    // Group emails by thread_id
+    const threadMap = new Map<string, Email[]>();
+    emails.forEach(email => {
+      if (email && email.thread_id) {
+        if (!threadMap.has(email.thread_id)) {
+          threadMap.set(email.thread_id, []);
+        }
+        threadMap.get(email.thread_id)!.push(email);
+      }
+    });
+    
+    // Convert to conversation objects
+    const allThreads = Array.from(threadMap.entries()).map(([thread_id, threadEmails]) => {
+      threadEmails.sort((a, b) => a.id.localeCompare(b.id));
+      const latestEmail = threadEmails[threadEmails.length - 1];
+      
+      return {
+        thread_id,
+        subject: latestEmail.subject,
+        sender: latestEmail.sender,
+        snippet: latestEmail.snippet,
+        message_count: threadEmails.length,
+        has_unread: threadEmails.some(email => !email.is_read),
+        latest_date: latestEmail.id,
+        emails: threadEmails
+      };
+    });
+    
+    // Filter based on settings
+    const filtered = showSingleMessageThreads 
+      ? allThreads 
+      : allThreads.filter(conv => conv.message_count > 1);
+    
+    return filtered.sort((a, b) => b.latest_date.localeCompare(a.latest_date));
+  }
+  
+  // Function to calculate stats
+  function calculateStats() {
+    const threadMap = new Map<string, Email[]>();
+    emails.forEach(email => {
+      if (email && email.thread_id) {
+        if (!threadMap.has(email.thread_id)) {
+          threadMap.set(email.thread_id, []);
+        }
+        threadMap.get(email.thread_id)!.push(email);
+      }
+    });
+    
+    const threadValues = Array.from(threadMap.values());
+    const multiMessageThreads = threadValues.filter(threadEmails => threadEmails.length > 1).length;
+    const singleMessageThreads = threadValues.filter(threadEmails => threadEmails.length === 1).length;
+    
+    return {
+      totalEmails: emails.length,
+      totalThreads: threadMap.size,
+      multiMessageThreads,
+      singleMessageThreads
+    };
+  }
+  
+  // Derived states using the functions
+  let conversations = $derived(calculateConversations());
+  let conversationStats = $derived(viewMode === 'conversations' ? calculateStats() : null);
   
   // Real-time updates state
   let autoPollingEnabled = $state(false);
@@ -166,12 +254,27 @@
     showEmailView = false;
     showSettings = false;
     selectedEmail = null;
+    selectedConversation = null;
   };
 
   const handleShowSettings = () => {
     showSettings = true;
     showEmailView = false;
     selectedEmail = null;
+    selectedConversation = null;
+  };
+
+  const handleConversationSelect = (conversation: Conversation) => {
+    selectedConversation = conversation;
+    showEmailView = true;
+    showSettings = false;
+  };
+
+  const handleViewModeToggle = () => {
+    viewMode = viewMode === 'emails' ? 'conversations' : 'emails';
+    selectedEmail = null;
+    selectedConversation = null;
+    showEmailView = false;
   };
 
 
@@ -306,14 +409,49 @@
         {totalCount}
         {unreadCount}
         {isAuthenticated}
+        {viewMode}
         onBackToInbox={handleBackToInbox}
         onShowSettings={handleShowSettings}
+        onViewModeToggle={handleViewModeToggle}
       />
 
-      {#if showEmailView && selectedEmail}
+      {#if showEmailView && (selectedEmail || selectedConversation)}
         {#if loadingEmail}
           <LoadingSpinner />
-        {:else}
+        {:else if selectedConversation}
+          <!-- TODO: Create ConversationViewer component -->
+          <div class="bg-white rounded-lg border border-gray-200 p-6">
+            <h2 class="text-lg font-semibold mb-4">
+              Conversation: {selectedConversation.subject}
+            </h2>
+            <p class="text-sm text-gray-600 mb-4">
+              {selectedConversation.message_count} messages in this thread
+            </p>
+            
+            <div class="space-y-4">
+              {#each selectedConversation.emails as email}
+                <div class="border border-gray-100 rounded-lg p-4 {email.is_read ? 'bg-gray-50' : 'bg-blue-50'}">
+                  <div class="flex justify-between items-start mb-2">
+                    <div>
+                      <h3 class="font-medium text-gray-900">{email.subject}</h3>
+                      <p class="text-sm text-gray-600">{email.sender}</p>
+                    </div>
+                    {#if !email.is_read}
+                      <span class="text-xs bg-blue-500 text-white px-2 py-1 rounded">Unread</span>
+                    {/if}
+                  </div>
+                  <p class="text-sm text-gray-700">{decode(email.snippet)}</p>
+                  <button 
+                    class="mt-2 text-sm text-blue-600 hover:text-blue-800"
+                    onclick={() => handleEmailSelect(email)}
+                  >
+                    View full message →
+                  </button>
+                </div>
+              {/each}
+            </div>
+          </div>
+        {:else if selectedEmail}
           <EmailViewer 
             email={selectedEmail}
             {sanitizeEmailHtml}
@@ -330,6 +468,35 @@
       {:else}
         {#if loading}
           <LoadingSpinner />
+        {:else if viewMode === 'conversations'}
+          {#if conversationStats && conversationStats.multiMessageThreads === 0}
+            <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-sm text-yellow-800">
+                    <strong>No multi-message conversations found.</strong> 
+                    All your emails have unique thread IDs.
+                  </p>
+                  <p class="text-xs text-yellow-700 mt-1">
+                    This is normal - most emails are standalone messages.
+                  </p>
+                </div>
+                <label class="flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    bind:checked={showSingleMessageThreads}
+                    class="rounded"
+                  />
+                  <span class="text-sm text-yellow-800">Show all as threads</span>
+                </label>
+              </div>
+            </div>
+          {/if}
+          
+          <ConversationList 
+            {conversations}
+            onConversationSelect={handleConversationSelect}
+          />
         {:else}
           <EmailList 
             {emails}
