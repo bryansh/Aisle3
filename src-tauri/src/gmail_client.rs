@@ -7,6 +7,7 @@ use base64::{Engine as _, engine::general_purpose::URL_SAFE};
 pub struct GmailMessage {
     pub id: String,
     pub snippet: String,
+    #[serde(rename = "labelIds")]
     pub label_ids: Option<Vec<String>>,
     pub payload: Option<MessagePayload>,
 }
@@ -149,7 +150,7 @@ impl GmailClient {
     }
 
     pub async fn get_message(&self, message_id: &str) -> Result<GmailMessage, Box<dyn std::error::Error + Send + Sync>> {
-        let url = format!("https://gmail.googleapis.com/gmail/v1/users/me/messages/{}", message_id);
+        let url = format!("https://gmail.googleapis.com/gmail/v1/users/me/messages/{}?format=full", message_id);
         
         let response = self.client
             .get(&url)
@@ -242,6 +243,50 @@ impl GmailClient {
         if !response.status().is_success() {
             let error_text = response.text().await?;
             return Err(format!("Gmail Stop Watch API error: {}", error_text).into());
+        }
+
+        Ok(())
+    }
+
+    pub async fn mark_as_read(&self, message_id: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let url = format!("https://gmail.googleapis.com/gmail/v1/users/me/messages/{}/modify", message_id);
+        
+        let modify_request = serde_json::json!({
+            "removeLabelIds": ["UNREAD"]
+        });
+
+        let response = self.client
+            .post(&url)
+            .bearer_auth(&self.access_token)
+            .json(&modify_request)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await?;
+            return Err(format!("Gmail modify API error: {}", error_text).into());
+        }
+
+        Ok(())
+    }
+
+    pub async fn mark_as_unread(&self, message_id: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let url = format!("https://gmail.googleapis.com/gmail/v1/users/me/messages/{}/modify", message_id);
+        
+        let modify_request = serde_json::json!({
+            "addLabelIds": ["UNREAD"]
+        });
+
+        let response = self.client
+            .post(&url)
+            .bearer_auth(&self.access_token)
+            .json(&modify_request)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await?;
+            return Err(format!("Gmail modify API error: {}", error_text).into());
         }
 
         Ok(())

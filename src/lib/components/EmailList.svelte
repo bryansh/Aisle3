@@ -1,10 +1,11 @@
 <script lang="ts">
   import { fade } from 'svelte/transition';
-  import { Badge } from 'flowbite-svelte';
-  import { Mail } from 'lucide-svelte';
+  import { Badge, Button } from 'flowbite-svelte';
+  import { Mail, MailOpen, MailX } from 'lucide-svelte';
 
   interface Email {
     id: string;
+    thread_id: string;
     subject: string;
     sender: string;
     snippet: string;
@@ -15,12 +16,39 @@
   interface Props {
     emails?: Email[];
     onEmailSelect: (email: Email) => void;
+    onMarkAsRead: (emailId: string) => void;
+    onMarkAsUnread: (emailId: string) => void;
   }
 
   let { 
     emails = [], 
-    onEmailSelect 
+    onEmailSelect,
+    onMarkAsRead,
+    onMarkAsUnread
   }: Props = $props();
+
+  // Track loading state for each email
+  let loadingEmails = $state(new Set<string>());
+
+  const handleToggleReadStatus = async (event: Event, email: Email) => {
+    event.stopPropagation(); // Prevent email selection
+    
+    // Add to loading set
+    loadingEmails.add(email.id);
+    loadingEmails = new Set(loadingEmails); // Trigger reactivity
+    
+    try {
+      if (email.is_read) {
+        await onMarkAsUnread(email.id);
+      } else {
+        await onMarkAsRead(email.id);
+      }
+    } finally {
+      // Remove from loading set
+      loadingEmails.delete(email.id);
+      loadingEmails = new Set(loadingEmails); // Trigger reactivity
+    }
+  };
 </script>
 
 {#if emails.length === 0}
@@ -42,6 +70,9 @@
           <div class="p-5">
             <div class="flex items-center justify-between mb-3">
               <div class="flex items-center min-w-0 flex-1">
+                {#if !email.is_read}
+                  <Badge color="blue" class="mr-2 flex-shrink-0">New</Badge>
+                {/if}
                 <span class="font-semibold text-gray-900 truncate max-w-xs mr-4">
                   {email.sender}
                 </span>
@@ -49,9 +80,24 @@
                   {email.subject}
                 </span>
               </div>
-              {#if !email.is_read}
-                <Badge color="blue" class="ml-3 flex-shrink-0">New</Badge>
-              {/if}
+              <div class="flex items-center gap-2 ml-3 flex-shrink-0">
+                <Button
+                  size="xs"
+                  color="light"
+                  onclick={(event) => handleToggleReadStatus(event, email)}
+                  disabled={loadingEmails.has(email.id)}
+                  class="p-1"
+                  title={email.is_read ? 'Mark as unread' : 'Mark as read'}
+                >
+                  {#if loadingEmails.has(email.id)}
+                    <div class="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+                  {:else if email.is_read}
+                    <MailX class="w-4 h-4" />
+                  {:else}
+                    <MailOpen class="w-4 h-4" />
+                  {/if}
+                </Button>
+              </div>
             </div>
             <p class="text-sm text-gray-500 truncate m-0 leading-relaxed">
               {email.snippet}

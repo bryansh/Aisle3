@@ -345,6 +345,36 @@ async fn refresh_tokens_if_needed(state: &State<'_, AppState>) -> Result<AuthTok
 
 
 #[tauri::command]
+async fn mark_email_as_read(email_id: String, state: State<'_, AppState>) -> Result<String, String> {
+    let tokens = match refresh_tokens_if_needed(&state).await {
+        Ok(tokens) => tokens,
+        Err(e) => return Err(format!("Authentication required: {}", e)),
+    };
+
+    let gmail_client = GmailClient::new(&tokens);
+    
+    match gmail_client.mark_as_read(&email_id).await {
+        Ok(_) => Ok("Email marked as read".to_string()),
+        Err(e) => Err(format!("Failed to mark email as read: {}", e)),
+    }
+}
+
+#[tauri::command]
+async fn mark_email_as_unread(email_id: String, state: State<'_, AppState>) -> Result<String, String> {
+    let tokens = match refresh_tokens_if_needed(&state).await {
+        Ok(tokens) => tokens,
+        Err(e) => return Err(format!("Authentication required: {}", e)),
+    };
+
+    let gmail_client = GmailClient::new(&tokens);
+    
+    match gmail_client.mark_as_unread(&email_id).await {
+        Ok(_) => Ok("Email marked as unread".to_string()),
+        Err(e) => Err(format!("Failed to mark email as unread: {}", e)),
+    }
+}
+
+#[tauri::command]
 async fn check_for_new_emails_since_last_check(state: State<'_, AppState>) -> Result<Vec<String>, String> {
     // Get auth tokens
     let tokens = match refresh_tokens_if_needed(&state).await {
@@ -407,7 +437,9 @@ fn main() {
             open_url,
             logout_gmail,
             get_email_content,
-            check_for_new_emails_since_last_check
+            check_for_new_emails_since_last_check,
+            mark_email_as_read,
+            mark_email_as_unread
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

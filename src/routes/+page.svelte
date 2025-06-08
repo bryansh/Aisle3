@@ -43,6 +43,9 @@
   let viewMode = $state<'emails' | 'conversations'>('emails');
   let selectedConversation = $state<Conversation | null>(null);
   
+  // Track loading state for read/unread operations
+  let loadingEmailStates = $state(new Set<string>());
+  
   // Conversation interface
   interface Conversation {
     thread_id: string;
@@ -347,6 +350,50 @@
     await checkForNewEmails(false);
   };
 
+  const handleMarkAsRead = async (emailId: string) => {
+    loadingEmailStates.add(emailId);
+    loadingEmailStates = new Set(loadingEmailStates);
+    
+    try {
+      await invoke('mark_email_as_read', { emailId });
+      
+      // Update local state
+      emails = emails.map(email => 
+        email.id === emailId ? { ...email, is_read: true } : email
+      );
+      
+      // Refresh stats
+      await loadStatsInBackground();
+    } catch (error) {
+      console.error('Error marking email as read:', error);
+    } finally {
+      loadingEmailStates.delete(emailId);
+      loadingEmailStates = new Set(loadingEmailStates);
+    }
+  };
+
+  const handleMarkAsUnread = async (emailId: string) => {
+    loadingEmailStates.add(emailId);
+    loadingEmailStates = new Set(loadingEmailStates);
+    
+    try {
+      await invoke('mark_email_as_unread', { emailId });
+      
+      // Update local state
+      emails = emails.map(email => 
+        email.id === emailId ? { ...email, is_read: false } : email
+      );
+      
+      // Refresh stats
+      await loadStatsInBackground();
+    } catch (error) {
+      console.error('Error marking email as unread:', error);
+    } finally {
+      loadingEmailStates.delete(emailId);
+      loadingEmailStates = new Set(loadingEmailStates);
+    }
+  };
+
   // Cleanup polling on component unmount
   $effect(() => {
     return () => {
@@ -441,12 +488,33 @@
                     {/if}
                   </div>
                   <p class="text-sm text-gray-700">{decode(email.snippet)}</p>
-                  <button 
-                    class="mt-2 text-sm text-blue-600 hover:text-blue-800"
-                    onclick={() => handleEmailSelect(email)}
-                  >
-                    View full message →
-                  </button>
+                  <div class="flex items-center justify-between mt-2">
+                    <button 
+                      class="text-sm text-blue-600 hover:text-blue-800"
+                      onclick={() => handleEmailSelect(email)}
+                    >
+                      View full message →
+                    </button>
+                    <button
+                      class="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                      disabled={loadingEmailStates.has(email.id)}
+                      onclick={(event) => {
+                        event.stopPropagation();
+                        if (email.is_read) {
+                          handleMarkAsUnread(email.id);
+                        } else {
+                          handleMarkAsRead(email.id);
+                        }
+                      }}
+                    >
+                      {#if loadingEmailStates.has(email.id)}
+                        <div class="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                        Loading...
+                      {:else}
+                        {email.is_read ? 'Mark unread' : 'Mark read'}
+                      {/if}
+                    </button>
+                  </div>
                 </div>
               {/each}
             </div>
@@ -501,6 +569,8 @@
           <EmailList 
             {emails}
             onEmailSelect={handleEmailSelect}
+            onMarkAsRead={handleMarkAsRead}
+            onMarkAsUnread={handleMarkAsUnread}
           />
         {/if}
       {/if}
