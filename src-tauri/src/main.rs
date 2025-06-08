@@ -6,7 +6,7 @@ mod gmail_client;
 mod gmail_config;
 
 use gmail_auth::{GmailAuth, AuthTokens, parse_callback_url};
-use gmail_client::{GmailClient, GmailMessage};
+use gmail_client::GmailClient;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::fs;
@@ -18,6 +18,7 @@ use tauri_plugin_updater::UpdaterExt;
 struct AppState {
     gmail_auth: Mutex<Option<GmailAuth>>,
     auth_tokens: Mutex<Option<AuthTokens>>,
+    last_check_time: Mutex<Option<String>>, // Store last email check timestamp
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -329,6 +330,48 @@ async fn refresh_tokens_if_needed(state: &State<'_, AppState>) -> Result<AuthTok
     }
 }
 
+
+#[tauri::command]
+async fn check_for_new_emails_since_last_check(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    // Get auth tokens
+    let tokens = match refresh_tokens_if_needed(&state).await {
+        Ok(tokens) => tokens,
+        Err(e) => return Err(format!("Authentication required: {}", e)),
+    };
+
+    // Get last check time
+    let last_check = {
+        let guard = state.last_check_time.lock().unwrap();
+        guard.clone()
+    };
+
+    // Create Gmail client
+    let gmail_client = GmailClient::new(&tokens);
+    
+    // Check for new emails
+    match gmail_client.check_for_new_emails(last_check.as_deref()).await {
+        Ok(new_email_ids) => {
+            // Update last check time to current Unix timestamp
+            let current_time = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                .to_string();
+            
+            *state.last_check_time.lock().unwrap() = Some(current_time);
+            
+            println!("📧 Found {} new emails since last check", new_email_ids.len());
+            Ok(new_email_ids)
+        }
+        Err(e) => {
+            eprintln!("Error checking for new emails: {}", e);
+            Err(e.to_string())
+        }
+    }
+}
+
+
+
 fn main() {
     // Load saved tokens on startup
     let saved_tokens = load_tokens();
@@ -337,7 +380,8 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(AppState {
             gmail_auth: Mutex::new(None),
-            auth_tokens: Mutex::new(saved_tokens), // Use saved tokens instead of None
+            auth_tokens: Mutex::new(saved_tokens),
+            last_check_time: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
             get_emails, 
@@ -349,7 +393,8 @@ fn main() {
             get_auth_status,
             open_url,
             logout_gmail,
-            get_email_content
+            get_email_content,
+            check_for_new_emails_since_last_check
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

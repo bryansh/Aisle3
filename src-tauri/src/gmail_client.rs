@@ -61,6 +61,23 @@ pub struct GmailProfile {
     pub threads_total: Option<u32>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WatchRequest {
+    #[serde(rename = "topicName")]
+    pub topic_name: String,
+    #[serde(rename = "labelIds")]
+    pub label_ids: Option<Vec<String>>,
+    #[serde(rename = "labelFilterAction")]
+    pub label_filter_action: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WatchResponse {
+    #[serde(rename = "historyId")]
+    pub history_id: String,
+    pub expiration: String,
+}
+
 pub struct GmailClient {
     client: Client,
     access_token: String,
@@ -164,6 +181,70 @@ impl GmailClient {
         }
         
         Ok(messages)
+    }
+
+    pub async fn check_for_new_emails(&self, since_time: Option<&str>) -> Result<Vec<String>, Box<dyn std::error::Error + Send + Sync>> {
+        // Build query to get emails newer than the specified time
+        let mut query = "in:inbox".to_string();
+        
+        if let Some(time) = since_time {
+            // Gmail uses Unix timestamp for 'after' queries
+            query.push_str(&format!(" after:{}", time));
+        }
+        
+        // Get recent emails (last 5 minutes worth if no time specified)
+        let response = self.list_messages(Some(10), None, Some(&query)).await?;
+        
+        let message_ids: Vec<String> = response
+            .messages
+            .unwrap_or_default()
+            .into_iter()
+            .map(|m| m.id)
+            .collect();
+        
+        Ok(message_ids)
+    }
+
+    pub async fn watch_inbox(&self, topic_name: &str) -> Result<WatchResponse, Box<dyn std::error::Error + Send + Sync>> {
+        let url = "https://gmail.googleapis.com/gmail/v1/users/me/watch";
+        
+        let watch_request = WatchRequest {
+            topic_name: topic_name.to_string(),
+            label_ids: Some(vec!["INBOX".to_string()]),
+            label_filter_action: Some("include".to_string()),
+        };
+
+        let response = self.client
+            .post(url)
+            .bearer_auth(&self.access_token)
+            .json(&watch_request)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await?;
+            return Err(format!("Gmail Watch API error: {}", error_text).into());
+        }
+
+        let watch_response: WatchResponse = response.json().await?;
+        Ok(watch_response)
+    }
+
+    pub async fn stop_watch(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let url = "https://gmail.googleapis.com/gmail/v1/users/me/stop";
+        
+        let response = self.client
+            .post(url)
+            .bearer_auth(&self.access_token)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await?;
+            return Err(format!("Gmail Stop Watch API error: {}", error_text).into());
+        }
+
+        Ok(())
     }
 }
 
