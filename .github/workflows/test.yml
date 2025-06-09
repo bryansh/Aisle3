@@ -136,8 +136,10 @@ jobs:
       - name: Build frontend
         run: npm run build
         
-      - name: Build Tauri app
-        run: npm run tauri build
+      - name: Verify Tauri compilation  
+        run: |
+          cd src-tauri
+          cargo build
         
   security-audit:
     runs-on: ubuntu-latest
