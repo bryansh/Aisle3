@@ -1,8 +1,8 @@
-use aisle3::gmail_client::*;
 use aisle3::gmail_auth::AuthTokens;
+use aisle3::gmail_client::*;
+use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use mockito::Server;
 use serde_json::json;
-use base64::{Engine as _, engine::general_purpose::URL_SAFE};
 
 fn create_test_message() -> GmailMessage {
     GmailMessage {
@@ -24,19 +24,15 @@ fn create_test_message() -> GmailMessage {
                     value: "Wed, 8 Jun 2025 10:00:00 +0000".to_string(),
                 },
             ]),
-            parts: Some(vec![
-                MessagePart {
-                    headers: Some(vec![
-                        MessageHeader {
-                            name: "Content-Type".to_string(),
-                            value: "text/plain; charset=UTF-8".to_string(),
-                        }
-                    ]),
-                    body: Some(MessageBody {
-                        data: Some(URL_SAFE.encode("Hello World Test Message")),
-                    }),
-                }
-            ]),
+            parts: Some(vec![MessagePart {
+                headers: Some(vec![MessageHeader {
+                    name: "Content-Type".to_string(),
+                    value: "text/plain; charset=UTF-8".to_string(),
+                }]),
+                body: Some(MessageBody {
+                    data: Some(URL_SAFE.encode("Hello World Test Message")),
+                }),
+            }]),
             body: None,
         }),
     }
@@ -76,7 +72,10 @@ fn test_gmail_message_get_from() {
 #[test]
 fn test_gmail_message_get_date() {
     let message = create_test_message();
-    assert_eq!(message.get_date(), Some("Wed, 8 Jun 2025 10:00:00 +0000".to_string()));
+    assert_eq!(
+        message.get_date(),
+        Some("Wed, 8 Jun 2025 10:00:00 +0000".to_string())
+    );
 }
 
 #[test]
@@ -146,7 +145,7 @@ fn test_gmail_response_deserialization() {
                 "threadId": "thread1"
             },
             {
-                "id": "msg2", 
+                "id": "msg2",
                 "threadId": "thread2"
             }
         ],
@@ -169,8 +168,9 @@ async fn test_gmail_client_creation() {
 
 #[test]
 fn test_batch_request_boundary_extraction() {
-    let response_text = "--batch_DAWKUsSXD9v4tWuYitTrY1N42DUtinxv\nContent-Type: application/http\n";
-    
+    let response_text =
+        "--batch_DAWKUsSXD9v4tWuYitTrY1N42DUtinxv\nContent-Type: application/http\n";
+
     if let Some(first_boundary_pos) = response_text.find("--batch_") {
         let boundary_start = first_boundary_pos + 2;
         if let Some(boundary_end) = response_text[boundary_start..].find('\n') {
@@ -210,7 +210,7 @@ Content-Type: application/json; charset=UTF-8
 
     let parts: Vec<&str> = batch_response.split("--batch_test123").collect();
     assert_eq!(parts.len(), 4); // Empty, part1, part2, final boundary
-    
+
     // Test JSON extraction from a part
     let part = parts[1];
     if let Some(json_start) = part.find('{') {
@@ -227,46 +227,54 @@ Content-Type: application/json; charset=UTF-8
 #[tokio::test]
 async fn test_get_profile_success() {
     let mut server = Server::new_async().await;
-    let _mock = server.mock("GET", "/gmail/v1/users/me/profile")
+    let _mock = server
+        .mock("GET", "/gmail/v1/users/me/profile")
         .with_status(200)
         .with_header("content-type", "application/json")
-        .with_body(json!({
-            "emailAddress": "test@example.com",
-            "messagesTotal": 1000,
-            "threadsTotal": 500
-        }).to_string())
+        .with_body(
+            json!({
+                "emailAddress": "test@example.com",
+                "messagesTotal": 1000,
+                "threadsTotal": 500
+            })
+            .to_string(),
+        )
         .create_async()
         .await;
 
     // Create client with test tokens
     let tokens = create_test_auth_tokens();
     let _client = GmailClient::new(&tokens);
-    
+
     // Note: This test demonstrates mock HTTP structure
     // To fully test HTTP calls, we'd need dependency injection for base URLs
     // Currently verifies the client can be created and mock structure is valid
-    
+
     // Test passes if client creation succeeds and mock is properly configured
-    assert!(true);
+    // No additional assertion needed - test passes if no panic occurs
 }
 
 #[tokio::test]
 async fn test_list_messages_with_parameters() {
     let mut server = Server::new_async().await;
-    let _mock = server.mock("GET", "/gmail/v1/users/me/messages")
+    let _mock = server
+        .mock("GET", "/gmail/v1/users/me/messages")
         .match_query(mockito::Matcher::AllOf(vec![
             mockito::Matcher::UrlEncoded("maxResults".into(), "10".into()),
             mockito::Matcher::UrlEncoded("q".into(), "in:inbox".into()),
         ]))
         .with_status(200)
         .with_header("content-type", "application/json")
-        .with_body(json!({
-            "messages": [
-                {"id": "msg1", "threadId": "thread1"},
-                {"id": "msg2", "threadId": "thread2"}
-            ],
-            "resultSizeEstimate": 2
-        }).to_string())
+        .with_body(
+            json!({
+                "messages": [
+                    {"id": "msg1", "threadId": "thread1"},
+                    {"id": "msg2", "threadId": "thread2"}
+                ],
+                "resultSizeEstimate": 2
+            })
+            .to_string(),
+        )
         .create_async()
         .await;
 
@@ -277,21 +285,24 @@ async fn test_list_messages_with_parameters() {
 #[test]
 fn test_html_body_extraction() {
     let mut message = create_test_message();
-    
+
     // Add HTML part
-    message.payload.as_mut().unwrap().parts.as_mut().unwrap().push(
-        MessagePart {
-            headers: Some(vec![
-                MessageHeader {
-                    name: "Content-Type".to_string(),
-                    value: "text/html; charset=UTF-8".to_string(),
-                }
-            ]),
+    message
+        .payload
+        .as_mut()
+        .unwrap()
+        .parts
+        .as_mut()
+        .unwrap()
+        .push(MessagePart {
+            headers: Some(vec![MessageHeader {
+                name: "Content-Type".to_string(),
+                value: "text/html; charset=UTF-8".to_string(),
+            }]),
             body: Some(MessageBody {
                 data: Some(URL_SAFE.encode("<p>HTML Content</p>")),
             }),
-        }
-    );
+        });
 
     let html = message.get_body_html();
     assert!(html.is_some());
@@ -308,13 +319,13 @@ fn test_empty_label_ids() {
 #[test]
 fn test_header_case_insensitive() {
     let mut message = create_test_message();
-    
+
     // Change header case
     if let Some(ref mut payload) = message.payload {
         if let Some(ref mut headers) = payload.headers {
             headers[0].name = "SUBJECT".to_string(); // uppercase
         }
     }
-    
+
     assert_eq!(message.get_subject(), "Test Subject");
 }

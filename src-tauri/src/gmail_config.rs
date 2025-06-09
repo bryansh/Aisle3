@@ -1,4 +1,4 @@
-use serde::{Deserialize};
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct GoogleCredentials {
@@ -11,7 +11,6 @@ pub struct InstalledApp {
     pub client_secret: String,
     pub auth_uri: String,
     pub token_uri: String,
-    pub redirect_uris: Vec<String>,
 }
 
 impl GoogleCredentials {

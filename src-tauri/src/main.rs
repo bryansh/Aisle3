@@ -5,10 +5,9 @@ mod gmail_auth;
 mod gmail_client;
 mod gmail_config;
 
-use gmail_auth::{GmailAuth, AuthTokens, parse_callback_url};
+use gmail_auth::{parse_callback_url, AuthTokens, GmailAuth};
 use gmail_client::GmailClient;
 use serde::{Deserialize, Serialize};
-use serde_json;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -34,30 +33,36 @@ struct Email {
 #[tauri::command]
 async fn install_update(app: tauri::AppHandle) -> Result<String, String> {
     println!("Install update called");
-    
+
     let updater = app.updater().map_err(|e| {
         println!("Updater error: {}", e);
         format!("Updater not available: {}", e)
     })?;
-    
+
     println!("Checking for updates...");
     match updater.check().await {
         Ok(Some(update)) => {
             println!("Update found, attempting to download and install...");
-            
+
             let on_chunk = |chunk_length: usize, content_length: Option<u64>| {
-                println!("Downloaded chunk: {} bytes, total: {:?}", chunk_length, content_length);
+                println!(
+                    "Downloaded chunk: {} bytes, total: {:?}",
+                    chunk_length, content_length
+                );
             };
-            
+
             let on_download_finish = || {
                 println!("Update download completed!");
             };
-            
-            match update.download_and_install(on_chunk, on_download_finish).await {
+
+            match update
+                .download_and_install(on_chunk, on_download_finish)
+                .await
+            {
                 Ok(_) => {
                     println!("Update installed successfully!");
                     Ok("Update installed successfully! Please restart the app.".to_string())
-                },
+                }
                 Err(e) => {
                     println!("Install error: {}", e);
                     Err(format!("Failed to install update: {}", e))
@@ -67,7 +72,7 @@ async fn install_update(app: tauri::AppHandle) -> Result<String, String> {
         Ok(None) => {
             println!("No update found during install");
             Err("No update available".to_string())
-        },
+        }
         Err(e) => {
             println!("Check error: {}", e);
             Err(format!("Failed to check for updates: {}", e))
@@ -99,7 +104,7 @@ async fn get_emails(state: State<'_, AppState>) -> Result<Vec<Email>, String> {
 
     // Create Gmail client and fetch real emails using the refreshed tokens
     let gmail_client = GmailClient::new(&tokens);
-    
+
     // List messages (get first 20)
     let response = gmail_client
         .list_messages(Some(20), None, None)
@@ -130,7 +135,7 @@ async fn get_emails(state: State<'_, AppState>) -> Result<Vec<Email>, String> {
                 .find(|(id, _)| *id == msg.id)
                 .map(|(_, thread_id)| thread_id.clone())
                 .unwrap_or_else(|| msg.id.clone()); // Fallback to message id if not found
-            
+
             Email {
                 id: msg.id.clone(),
                 thread_id,
@@ -145,7 +150,6 @@ async fn get_emails(state: State<'_, AppState>) -> Result<Vec<Email>, String> {
     Ok(emails)
 }
 
-
 #[tauri::command]
 async fn get_inbox_stats(state: State<'_, AppState>) -> Result<(u32, u32), String> {
     // This will either return valid tokens or an error
@@ -156,18 +160,21 @@ async fn get_inbox_stats(state: State<'_, AppState>) -> Result<(u32, u32), Strin
 
     // Create Gmail client and get profile using the refreshed tokens
     let gmail_client = GmailClient::new(&tokens);
-    
+
     match gmail_client.get_profile().await {
         Ok(profile) => {
             let total = profile.messages_total.unwrap_or(0);
-            
+
             // Get unread count by querying unread messages
-            match gmail_client.list_messages(Some(1), None, Some("is:unread")).await {
+            match gmail_client
+                .list_messages(Some(1), None, Some("is:unread"))
+                .await
+            {
                 Ok(unread_response) => {
                     let unread = unread_response.result_size_estimate.unwrap_or(0);
                     Ok((total, unread))
                 }
-                Err(_) => Ok((total, 0))
+                Err(_) => Ok((total, 0)),
             }
         }
         Err(e) => Err(e.to_string()),
@@ -176,8 +183,10 @@ async fn get_inbox_stats(state: State<'_, AppState>) -> Result<(u32, u32), Strin
 
 #[tauri::command]
 async fn check_for_updates(app: tauri::AppHandle) -> Result<String, String> {
-    let updater = app.updater().map_err(|e| format!("Updater not available: {}", e))?;
-    
+    let updater = app
+        .updater()
+        .map_err(|e| format!("Updater not available: {}", e))?;
+
     match updater.check().await {
         Ok(Some(update)) => Ok(format!("Update available: {}", update.version)),
         Ok(None) => Ok("No updates available".to_string()),
@@ -189,10 +198,10 @@ async fn check_for_updates(app: tauri::AppHandle) -> Result<String, String> {
 async fn start_gmail_auth(state: State<'_, AppState>) -> Result<String, String> {
     let mut gmail_auth = GmailAuth::new().map_err(|e| e.to_string())?;
     let auth_url = gmail_auth.get_auth_url().map_err(|e| e.to_string())?;
-    
+
     // Store the auth instance
     *state.gmail_auth.lock().unwrap() = Some(gmail_auth);
-    
+
     Ok(auth_url)
 }
 
@@ -214,7 +223,7 @@ async fn get_email_content(
 
     // Create Gmail client and fetch the specific email
     let gmail_client = GmailClient::new(&tokens);
-    
+
     let message = gmail_client
         .get_message(&email_id)
         .await
@@ -242,35 +251,38 @@ async fn complete_gmail_auth(
 ) -> Result<String, String> {
     // Parse the callback URL
     let (code, _state) = parse_callback_url(&callback_url).map_err(|e| e.to_string())?;
-    
+
     // Clone the auth instance to avoid holding the lock across await
     let gmail_auth = {
         let auth_guard = state.gmail_auth.lock().unwrap();
         auth_guard.as_ref().ok_or("No auth session found")?.clone()
     };
-    
+
     // Exchange code for tokens (now we don't hold the lock)
-    let tokens = gmail_auth.exchange_code(&code).await.map_err(|e| e.to_string())?;
-    
+    let tokens = gmail_auth
+        .exchange_code(&code)
+        .await
+        .map_err(|e| e.to_string())?;
+
     // Store tokens
     *state.auth_tokens.lock().unwrap() = Some(tokens.clone());
 
     // Save tokens to disk for persistence
     save_tokens(&tokens).map_err(|e| format!("Failed to save tokens: {}", e))?;
-    
+
     Ok("Authentication successful!".to_string())
 }
 
 #[tauri::command]
 async fn logout_gmail(state: State<'_, AppState>) -> Result<String, String> {
     *state.auth_tokens.lock().unwrap() = None;
-    
+
     // Delete saved tokens
     let token_file = get_token_file_path();
     if token_file.exists() {
         std::fs::remove_file(token_file).map_err(|e| e.to_string())?;
     }
-    
+
     Ok("Logged out successfully".to_string())
 }
 
@@ -321,7 +333,7 @@ async fn refresh_tokens_if_needed(state: &State<'_, AppState>) -> Result<AuthTok
 
     // Try to use the current tokens first
     let gmail_client = GmailClient::new(&tokens);
-    
+
     // Test if tokens work by trying to get profile
     match gmail_client.get_profile().await {
         Ok(_) => Ok(tokens), // Tokens work fine
@@ -329,12 +341,15 @@ async fn refresh_tokens_if_needed(state: &State<'_, AppState>) -> Result<AuthTok
             // Tokens expired, try to refresh
             if let Some(refresh_token) = &tokens.refresh_token {
                 let gmail_auth = GmailAuth::new().map_err(|e| e.to_string())?;
-                let new_tokens = gmail_auth.refresh_access_token(refresh_token).await.map_err(|e| e.to_string())?;
-                
+                let new_tokens = gmail_auth
+                    .refresh_access_token(refresh_token)
+                    .await
+                    .map_err(|e| e.to_string())?;
+
                 // Store the new tokens
                 *state.auth_tokens.lock().unwrap() = Some(new_tokens.clone());
                 save_tokens(&new_tokens).map_err(|e| format!("Failed to save tokens: {}", e))?;
-                
+
                 Ok(new_tokens)
             } else {
                 Err("No refresh token available".to_string())
@@ -343,16 +358,18 @@ async fn refresh_tokens_if_needed(state: &State<'_, AppState>) -> Result<AuthTok
     }
 }
 
-
 #[tauri::command]
-async fn mark_email_as_read(email_id: String, state: State<'_, AppState>) -> Result<String, String> {
+async fn mark_email_as_read(
+    email_id: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
     let tokens = match refresh_tokens_if_needed(&state).await {
         Ok(tokens) => tokens,
         Err(e) => return Err(format!("Authentication required: {}", e)),
     };
 
     let gmail_client = GmailClient::new(&tokens);
-    
+
     match gmail_client.mark_as_read(&email_id).await {
         Ok(_) => Ok("Email marked as read".to_string()),
         Err(e) => Err(format!("Failed to mark email as read: {}", e)),
@@ -360,14 +377,17 @@ async fn mark_email_as_read(email_id: String, state: State<'_, AppState>) -> Res
 }
 
 #[tauri::command]
-async fn mark_email_as_unread(email_id: String, state: State<'_, AppState>) -> Result<String, String> {
+async fn mark_email_as_unread(
+    email_id: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
     let tokens = match refresh_tokens_if_needed(&state).await {
         Ok(tokens) => tokens,
         Err(e) => return Err(format!("Authentication required: {}", e)),
     };
 
     let gmail_client = GmailClient::new(&tokens);
-    
+
     match gmail_client.mark_as_unread(&email_id).await {
         Ok(_) => Ok("Email marked as unread".to_string()),
         Err(e) => Err(format!("Failed to mark email as unread: {}", e)),
@@ -375,7 +395,9 @@ async fn mark_email_as_unread(email_id: String, state: State<'_, AppState>) -> R
 }
 
 #[tauri::command]
-async fn check_for_new_emails_since_last_check(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+async fn check_for_new_emails_since_last_check(
+    state: State<'_, AppState>,
+) -> Result<Vec<String>, String> {
     // Get auth tokens
     let tokens = match refresh_tokens_if_needed(&state).await {
         Ok(tokens) => tokens,
@@ -390,9 +412,12 @@ async fn check_for_new_emails_since_last_check(state: State<'_, AppState>) -> Re
 
     // Create Gmail client
     let gmail_client = GmailClient::new(&tokens);
-    
+
     // Check for new emails
-    match gmail_client.check_for_new_emails(last_check.as_deref()).await {
+    match gmail_client
+        .check_for_new_emails(last_check.as_deref())
+        .await
+    {
         Ok(new_email_ids) => {
             // Update last check time to current Unix timestamp
             let current_time = std::time::SystemTime::now()
@@ -400,10 +425,13 @@ async fn check_for_new_emails_since_last_check(state: State<'_, AppState>) -> Re
                 .unwrap()
                 .as_secs()
                 .to_string();
-            
+
             *state.last_check_time.lock().unwrap() = Some(current_time);
-            
-            println!("📧 Found {} new emails since last check", new_email_ids.len());
+
+            println!(
+                "📧 Found {} new emails since last check",
+                new_email_ids.len()
+            );
             Ok(new_email_ids)
         }
         Err(e) => {
@@ -412,8 +440,6 @@ async fn check_for_new_emails_since_last_check(state: State<'_, AppState>) -> Re
         }
     }
 }
-
-
 
 fn main() {
     // Load saved tokens on startup
@@ -427,8 +453,8 @@ fn main() {
             last_check_time: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
-            get_emails, 
-            get_inbox_stats, 
+            get_emails,
+            get_inbox_stats,
             check_for_updates,
             install_update,
             start_gmail_auth,

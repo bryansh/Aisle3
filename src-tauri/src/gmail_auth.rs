@@ -1,10 +1,10 @@
-use oauth2::{
-    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, RedirectUrl,
-    Scope, TokenResponse, TokenUrl,
-};
-use oauth2::basic::{BasicClient};
+use oauth2::basic::BasicClient;
 use oauth2::reqwest::async_http_client;
-use oauth2::{RefreshToken};
+use oauth2::RefreshToken;
+use oauth2::{
+    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope,
+    TokenResponse, TokenUrl,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use url::Url;
@@ -27,7 +27,7 @@ pub struct GmailAuth {
 impl GmailAuth {
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let credentials = GoogleCredentials::from_json()?;
-        
+
         let client = BasicClient::new(
             ClientId::new(credentials.installed.client_id),
             Some(ClientSecret::new(credentials.installed.client_secret)),
@@ -44,7 +44,7 @@ impl GmailAuth {
 
     pub fn get_auth_url(&mut self) -> Result<String, Box<dyn std::error::Error>> {
         let mut auth_request = self.client.authorize_url(CsrfToken::new_random);
-        
+
         // Add scopes
         for scope in SCOPES {
             auth_request = auth_request.add_scope(Scope::new(scope.to_string()));
@@ -52,11 +52,14 @@ impl GmailAuth {
 
         let (auth_url, csrf_token) = auth_request.url();
         self.csrf_token = Some(csrf_token);
-        
+
         Ok(auth_url.to_string())
     }
 
-    pub async fn exchange_code(&self, code: &str) -> Result<AuthTokens, Box<dyn std::error::Error>> {
+    pub async fn exchange_code(
+        &self,
+        code: &str,
+    ) -> Result<AuthTokens, Box<dyn std::error::Error>> {
         let token_result = self
             .client
             .exchange_code(AuthorizationCode::new(code.to_string()))
@@ -74,7 +77,10 @@ impl GmailAuth {
         })
     }
 
-    pub async fn refresh_access_token(&self, refresh_token: &str) -> Result<AuthTokens, Box<dyn std::error::Error>> {
+    pub async fn refresh_access_token(
+        &self,
+        refresh_token: &str,
+    ) -> Result<AuthTokens, Box<dyn std::error::Error>> {
         let token_result = self
             .client
             .exchange_refresh_token(&RefreshToken::new(refresh_token.to_string()))
@@ -82,7 +88,8 @@ impl GmailAuth {
             .await?;
 
         let access_token = token_result.access_token().secret().clone();
-        let new_refresh_token = token_result.refresh_token()
+        let new_refresh_token = token_result
+            .refresh_token()
             .map(|rt| rt.secret().clone())
             .or_else(|| Some(refresh_token.to_string())); // Keep existing if no new one
         let expires_in = token_result.expires_in().map(|d| d.as_secs());
@@ -96,21 +103,21 @@ impl GmailAuth {
 }
 
 // Helper function to parse callback URL
-pub fn parse_callback_url(url: &str) -> Result<(String, Option<String>), Box<dyn std::error::Error>> {
+pub fn parse_callback_url(
+    url: &str,
+) -> Result<(String, Option<String>), Box<dyn std::error::Error>> {
     let parsed_url = Url::parse(url)?;
-    let params: HashMap<String, String> = parsed_url
-        .query_pairs()
-        .into_owned()
-        .collect();
+    let params: HashMap<String, String> = parsed_url.query_pairs().into_owned().collect();
 
     if let Some(error) = params.get("error") {
         return Err(format!("OAuth error: {}", error).into());
     }
 
-    let code = params.get("code")
+    let code = params
+        .get("code")
         .ok_or("No authorization code found")?
         .clone();
-    
+
     let state = params.get("state").cloned();
 
     Ok((code, state))
