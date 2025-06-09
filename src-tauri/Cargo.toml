@@ -5,6 +5,14 @@ description = "A Gmail Client for Inbox Management"
 authors = ["bryansh"]
 edition = "2021"
 
+[lib]
+name = "aisle3"
+path = "src/lib.rs"
+
+[[bin]]
+name = "aisle3"
+path = "src/main.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -23,3 +31,10 @@ urlencoding = "2.1"
 dirs = "5.0"
 # Removed webhook dependencies: warp, bytes, futures-util
 # google-cloud-pubsub = "0.22"  # Available when needed for full Pub/Sub integration
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockito = "1.4"
+tempfile = "3.0"
+assert_matches = "1.5"
+chrono = { version = "0.4", features = ["serde"] }

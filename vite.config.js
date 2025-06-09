@@ -29,4 +29,25 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+
+  // Test configuration
+  test: {
+    globals: true,
+    environment: 'happy-dom',
+    setupFiles: ['./src/setupTests.js'],
+    include: ['src/**/*.{test,spec}.{js,ts}'],
+    coverage: {
+      reporter: ['text', 'json', 'html'],
+      exclude: [
+        'node_modules/',
+        'src/setupTests.js',
+        '**/*.spec.js',
+        '**/*.test.js'
+      ]
+    },
+    alias: {
+      '$lib': '/src/lib',
+      '$app': '/src/app'
+    }
+  }
 }));
