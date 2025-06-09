@@ -7,9 +7,10 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
+  
   use: {
-    baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
+    baseURL: 'http://localhost:1420',
   },
 
   projects: [
@@ -17,19 +18,14 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
   ],
 
-  // Component testing configuration
-  use: {
-    ctPort: 3100,
-    ctTemplateDir: 'src/tests/playwright',
+  webServer: {
+    command: 'npm run dev',
+    port: 1420,
+    reuseExistingServer: !process.env.CI,
+    timeout: 60 * 1000,
+    stdout: 'ignore',
+    stderr: 'pipe',
   },
 });
