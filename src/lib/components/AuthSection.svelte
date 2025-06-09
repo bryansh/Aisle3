@@ -74,15 +74,15 @@
       {#if authMessage}
         <div class="mt-6">
           {#if authMessage.includes('Error')}
-            <Alert color="red">
-              <AlertTriangle slot="icon" class="w-4 h-4" />
+            <div class="flex items-center p-4 mb-4 text-sm text-red-800 border border-red-300 rounded-lg bg-red-50">
+              <AlertTriangle class="w-4 h-4 mr-2" />
               {authMessage}
-            </Alert>
+            </div>
           {:else if authMessage.includes('Successfully')}
-            <Alert color="green">
-              <CheckCircle slot="icon" class="w-4 h-4" />
+            <div class="flex items-center p-4 mb-4 text-sm text-green-800 border border-green-300 rounded-lg bg-green-50">
+              <CheckCircle class="w-4 h-4 mr-2" />
               {authMessage}
-            </Alert>
+            </div>
           {:else}
             <Alert color="blue">
               {authMessage}

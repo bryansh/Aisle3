@@ -32,7 +32,7 @@ jobs:
         
       # NOTE: Component tests are blocked by Svelte 5 SSR issue with @testing-library/svelte
       # These tests are properly structured but mount() is not available on server
-      # Running only working tests until Svelte 5 testing support improves
+      # Running working tests - E2E tests with Playwright are available locally (npm run test:e2e)
         
       - name: Run service tests (26/26 passing)
         run: npm run test:services
@@ -81,7 +81,6 @@ jobs:
         
       - name: Run Rust tests
         run: cd src-tauri && cargo test --verbose
-        continue-on-error: true  # Allow one mock test to fail temporarily
         
       - name: Run Rust tests with coverage
         run: |

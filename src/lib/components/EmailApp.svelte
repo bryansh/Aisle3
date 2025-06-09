@@ -38,7 +38,7 @@
   // Auto-polling state
   let autoPollingEnabled = $state(false);
   let pollingIntervalSeconds = $state(30);
-  let pollingInterval = $state(null);
+  let pollingInterval: number | null = $state(null);
 
   // Load settings from localStorage
   const loadSettings = () => {
@@ -64,22 +64,26 @@
   };
 
   // Check authentication status on mount
-  onMount(async () => {
-    try {
-      loadSettings();
-      
-      isAuthenticated = await invoke<boolean>('get_auth_status');
-      if (isAuthenticated) {
-        await emailOperations.loadEmails();
-        await emailOperations.loadStats();
+  onMount(() => {
+    const initializeApp = async () => {
+      try {
+        loadSettings();
         
-        if (autoPollingEnabled) {
-          startAutoPolling();
+        isAuthenticated = await invoke<boolean>('get_auth_status');
+        if (isAuthenticated) {
+          await emailOperations.loadEmails();
+          await emailOperations.loadStats();
+          
+          if (autoPollingEnabled) {
+            startAutoPolling();
+          }
         }
+      } catch (error) {
+        console.error('Error checking auth status:', error);
       }
-    } catch (error) {
-      console.error('Error checking auth status:', error);
-    }
+    };
+
+    initializeApp();
 
     // Add ESC key event listener
     const handleKeydown = (event: KeyboardEvent) => {
@@ -106,7 +110,7 @@
   };
 
   // Email selection handlers
-  const handleEmailSelect = async (email) => {
+  const handleEmailSelect = async (email: any) => {
     try {
       await emailOperations.getEmailContent(email.id);
     } catch (error) {
@@ -114,7 +118,7 @@
     }
   };
 
-  const handleConversationSelect = (conversation) => {
+  const handleConversationSelect = (conversation: any) => {
     navigationOperations.selectConversation(conversation);
   };
 
@@ -178,32 +182,11 @@
         'href', 'src', 'alt', 'title', 'style', 'target',
         'width', 'height', 'border', 'cellpadding', 'cellspacing', 'bgcolor', 'background'
       ],
-      ALLOWED_STYLES: [
-        'color', 'font-size', 'font-weight', 'font-family', 'text-align', 
-        'text-decoration', 'line-height', 'background-color',
-        'padding', 'margin', 'border', 'border-radius'
-      ],
       KEEP_CONTENT: true,
       RETURN_DOM: false,
       SANITIZE_DOM: true,
       FORBID_ATTR: ['onerror', 'onload', 'onclick'],
-      ADD_ATTR: ['target'],
-      TRANSFORM_TAGS: {
-        'img': function(tagName, attribs) {
-          const width = attribs.width;
-          const height = attribs.height;
-          
-          if (width === '1' && height === '1') {
-            return null;
-          }
-          
-          attribs.style = (attribs.style || '') + '; max-width: 100%; height: auto;';
-          delete attribs.width;
-          delete attribs.height;
-          
-          return { tagName: tagName, attribs: attribs };
-        }
-      }
+      ADD_ATTR: ['target']
     });
   }
 </script>
@@ -217,7 +200,7 @@
         totalCount={$totalCount}
         unreadCount={$unreadCount}
         {isAuthenticated}
-        viewMode={$viewMode}
+        viewMode={$viewMode as "emails" | "conversations"}
         onBackToInbox={navigationOperations.backToInbox}
         onShowSettings={navigationOperations.showSettingsView}
         onViewModeToggle={navigationOperations.toggleViewMode}

@@ -50,11 +50,12 @@
     <!-- Auto-polling toggle -->
     <div class="flex items-center justify-between mb-4">
       <div>
-        <label class="text-sm font-medium text-gray-700">Automatic email checking</label>
+        <label for="auto-polling-toggle" class="text-sm font-medium text-gray-700">Automatic email checking</label>
         <p class="text-xs text-gray-500">Automatically check for new emails in the background</p>
       </div>
       <label class="relative inline-flex items-center cursor-pointer">
         <input 
+          id="auto-polling-toggle"
           type="checkbox" 
           bind:checked={autoPollingEnabled}
           onchange={handleToggleAutoPolling}
@@ -67,8 +68,9 @@
     <!-- Polling interval -->
     {#if autoPollingEnabled}
       <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-2">Check frequency</label>
+        <label for="polling-interval" class="block text-sm font-medium text-gray-700 mb-2">Check frequency</label>
         <select 
+          id="polling-interval" 
           bind:value={pollingInterval}
           onchange={handleIntervalChange}
           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"

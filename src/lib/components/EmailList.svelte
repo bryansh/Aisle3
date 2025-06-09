@@ -73,7 +73,7 @@
                 <Button
                   size="xs"
                   color="light"
-                  onclick={(event) => handleToggleReadStatus(event, email)}
+                  onclick={(event: Event) => handleToggleReadStatus(event, email)}
                   disabled={loadingEmailStates.has(email.id)}
                   class="p-1"
                   title={email.is_read ? 'Mark as unread' : 'Mark as read'}

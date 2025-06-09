@@ -6,6 +6,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 export class EmailService {
   constructor() {
+    /** @type {any[]} */
     this.emails = [];
     this.totalCount = 0;
     this.unreadCount = 0;
@@ -72,6 +73,9 @@ export class EmailService {
   /**
    * Get email content by ID
    */
+  /**
+   * @param {string} emailId
+   */
   async getEmailContent(emailId) {
     try {
       return await invoke('get_email_content', { emailId });
@@ -83,6 +87,9 @@ export class EmailService {
 
   /**
    * Mark email as read
+   */
+  /**
+   * @param {string} emailId
    */
   async markAsRead(emailId) {
     try {
@@ -105,6 +112,9 @@ export class EmailService {
 
   /**
    * Mark email as unread
+   */
+  /**
+   * @param {string} emailId
    */
   async markAsUnread(emailId) {
     try {
@@ -174,6 +184,9 @@ export class EmailService {
   /**
    * Find email by ID
    */
+  /**
+   * @param {string} emailId
+   */
   findEmailById(emailId) {
     return this.emails.find(email => email.id === emailId);
   }
@@ -195,7 +208,7 @@ export class EmailService {
 
     // Convert to conversation objects
     const allThreads = Array.from(threadMap.entries()).map(([thread_id, threadEmails]) => {
-      threadEmails.sort((a, b) => a.id.localeCompare(b.id));
+      threadEmails.sort(/** @param {any} a @param {any} b */ (a, b) => a.id.localeCompare(b.id));
       const latestEmail = threadEmails[threadEmails.length - 1];
       
       return {
@@ -204,7 +217,7 @@ export class EmailService {
         sender: latestEmail.sender,
         snippet: latestEmail.snippet,
         message_count: threadEmails.length,
-        has_unread: threadEmails.some(email => !email.is_read),
+        has_unread: threadEmails.some(/** @param {any} email */ email => !email.is_read),
         latest_date: latestEmail.id,
         emails: threadEmails
       };

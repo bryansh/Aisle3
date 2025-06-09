@@ -2,6 +2,7 @@ import { writable, derived } from 'svelte/store';
 import { emailService } from '../services/emailService.js';
 
 // Core email state
+/** @type {import('svelte/store').Writable<any[]>} */
 export const emails = writable([]);
 export const totalCount = writable(0);
 export const unreadCount = writable(0);
@@ -93,6 +94,9 @@ export const emailOperations = {
     }
   },
 
+  /**
+   * @param {string} emailId
+   */
   async getEmailContent(emailId) {
     loadingEmail.set(true);
     try {
@@ -108,6 +112,9 @@ export const emailOperations = {
     }
   },
 
+  /**
+   * @param {string} emailId
+   */
   async markAsRead(emailId) {
     // Add to loading set
     loadingEmailStates.update(set => {
@@ -120,8 +127,8 @@ export const emailOperations = {
       await emailService.markAsRead(emailId);
       
       // Update emails store
-      emails.update(emailList => 
-        emailList.map(email => 
+      emails.update(/** @param {any[]} emailList */ emailList => 
+        emailList.map(/** @param {any} email */ email => 
           email.id === emailId ? { ...email, is_read: true } : email
         )
       );
@@ -141,6 +148,9 @@ export const emailOperations = {
     }
   },
 
+  /**
+   * @param {string} emailId
+   */
   async markAsUnread(emailId) {
     // Add to loading set
     loadingEmailStates.update(set => {
@@ -153,8 +163,8 @@ export const emailOperations = {
       await emailService.markAsUnread(emailId);
       
       // Update emails store
-      emails.update(emailList => 
-        emailList.map(email => 
+      emails.update(/** @param {any[]} emailList */ emailList => 
+        emailList.map(/** @param {any} email */ email => 
           email.id === emailId ? { ...email, is_read: false } : email
         )
       );
@@ -210,6 +220,9 @@ export const navigationOperations = {
     selectedConversation.set(null);
   },
 
+  /**
+   * @param {any} conversation
+   */
   selectConversation(conversation) {
     selectedConversation.set(conversation);
     showEmailView.set(true);
