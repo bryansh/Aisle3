@@ -361,7 +361,7 @@ impl GmailClient {
                 }
             }
 
-            email_content.push_str(&plain_body.trim());
+            email_content.push_str(plain_body.trim());
             email_content.push_str("\r\n\r\n");
 
             // HTML part
