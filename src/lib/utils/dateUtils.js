@@ -170,9 +170,9 @@ export function isThisWeek(dateInput) {
 
 /**
  * Sort emails by date (newest first)
- * @param {Array} emails - Array of email objects with date property
+ * @param {Array<any>} emails - Array of email objects with date property
  * @param {string} dateField - Field name containing the date (default: 'date')
- * @returns {Array} Sorted array of emails
+ * @returns {Array<any>} Sorted array of emails
  */
 export function sortEmailsByDate(emails, dateField = 'date') {
   return [...emails].sort((a, b) => {

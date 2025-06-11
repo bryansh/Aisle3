@@ -84,7 +84,7 @@
 </script>
 
 <BubbleMenu
-	{editor}
+	editor={editor as any}
 	class={cn(
 		'edra-bubblemenu flex h-fit w-fit items-center gap-1 rounded-md border bg-background/90 p-0.5 backdrop-blur-md',
 		className

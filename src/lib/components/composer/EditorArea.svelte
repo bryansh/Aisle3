@@ -155,6 +155,12 @@
       closeDropdowns();
       editor?.commands.focus();
     }}
+    onkeydown={(event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        closeDropdowns();
+        editor?.commands.focus();
+      }
+    }}
     role="textbox"
     tabindex="0"
     aria-label="Email content editor"

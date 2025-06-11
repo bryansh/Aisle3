@@ -8,7 +8,7 @@
     editor
   } = $props();
 
-  let linkInputElement;
+  /** @type {HTMLInputElement | null} */ let linkInputElement = null;
 
   function applyLink() {
     if (linkUrl && linkUrl.trim() && linkUrl !== 'https://') {
@@ -27,7 +27,7 @@
     editor?.commands.focus();
   }
 
-  function handleKeydown(event) {
+  function handleKeydown(/** @type {KeyboardEvent} */ event) {
     if (event.key === 'Enter') {
       event.preventDefault();
       applyLink();

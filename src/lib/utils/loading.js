@@ -11,6 +11,7 @@ export class LoadingStateManager {
   
   /**
    * Create a simple boolean loading state
+   * @param {string} key
    */
   createLoadingState(key) {
     if (this.states.has(key)) {
@@ -24,6 +25,7 @@ export class LoadingStateManager {
   
   /**
    * Create a set-based loading state for tracking multiple concurrent operations
+   * @param {string} key
    */
   createSetBasedLoadingState(key) {
     if (this.states.has(key)) {
@@ -33,21 +35,21 @@ export class LoadingStateManager {
     const state = writable(new Set());
     const helper = {
       store: state,
-      add: (id) => {
+      add: (/** @type {string} */ id) => {
         state.update(set => {
           const newSet = new Set(set);
           newSet.add(id);
           return newSet;
         });
       },
-      remove: (id) => {
+      remove: (/** @type {string} */ id) => {
         state.update(set => {
           const newSet = new Set(set);
           newSet.delete(id);
           return newSet;
         });
       },
-      has: (id) => get(state).has(id),
+      has: (/** @type {string} */ id) => get(state).has(id),
       clear: () => state.set(new Set()),
       size: () => get(state).size
     };
@@ -58,6 +60,7 @@ export class LoadingStateManager {
   
   /**
    * Get existing loading state
+   * @param {string} key
    */
   getLoadingState(key) {
     return this.states.get(key);
@@ -65,6 +68,7 @@ export class LoadingStateManager {
   
   /**
    * Remove loading state
+   * @param {string} key
    */
   removeLoadingState(key) {
     this.states.delete(key);
@@ -81,9 +85,10 @@ export class LoadingStateManager {
 
 /**
  * Wrap async operations with loading state management
+ * @param {any} loadingStore
  */
 export function createAsyncOperation(loadingStore) {
-  return async function(operation) {
+  return async function(/** @type {() => Promise<any>} */ operation) {
     loadingStore.set(true);
     try {
       return await operation();
@@ -98,9 +103,11 @@ export function createAsyncOperation(loadingStore) {
 
 /**
  * Wrap async operations with set-based loading state management
+ * @param {any} loadingHelper
+ * @param {string} id
  */
 export function createAsyncOperationWithId(loadingHelper, id) {
-  return async function(operation) {
+  return async function(/** @type {() => Promise<any>} */ operation) {
     loadingHelper.add(id);
     try {
       return await operation();
@@ -115,10 +122,11 @@ export function createAsyncOperationWithId(loadingHelper, id) {
 
 /**
  * Create debounced loading state (useful for rapid fire operations)
+ * @param {number} delay
  */
 export function createDebouncedLoadingState(delay = 200) {
   const state = writable(false);
-  let timeoutId = null;
+  /** @type {number | null} */ let timeoutId = null;
   
   return {
     store: state,
@@ -159,13 +167,15 @@ export const LOADING_KEYS = {
 
 /**
  * Helper to create standardized loading states
+ * @param {string} key
  */
 export function useLoadingState(key) {
   return globalLoadingManager.createLoadingState(key);
 }
 
 /**
- * Helper to create standardized set-based loading states  
+ * Helper to create standardized set-based loading states
+ * @param {string} key
  */
 export function useSetLoadingState(key) {
   return globalLoadingManager.createSetBasedLoadingState(key);
@@ -173,9 +183,12 @@ export function useSetLoadingState(key) {
 
 /**
  * Retry logic with exponential backoff
+ * @param {() => Promise<any>} operation
+ * @param {number} maxRetries
+ * @param {number} baseDelay
  */
 export async function retryWithBackoff(operation, maxRetries = 3, baseDelay = 1000) {
-  let lastError;
+  /** @type {any} */ let lastError;
   
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {

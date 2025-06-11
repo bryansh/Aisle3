@@ -87,22 +87,22 @@
     editor?.chain().focus().clearNodes().unsetAllMarks().run();
   }
 
-  function setTextAlign(alignment) {
+  function setTextAlign(/** @type {string} */ alignment) {
     editor?.chain().focus().setTextAlign(alignment).run();
   }
 
-  function setTextColor(color) {
+  function setTextColor(/** @type {string} */ color) {
     editor?.chain().focus().setColor(color).run();
     showColorPicker = false;
   }
 
-  function setFontFamily(font) {
+  function setFontFamily(/** @type {string} */ font) {
     editor?.chain().focus().setFontFamily(font).run();
     currentFont = font;
     showFontSelector = false;
   }
 
-  function setFontSize(size) {
+  function setFontSize(/** @type {string} */ size) {
     editor?.chain().focus().setFontSize(size + 'px').run();
     currentFontSize = size + 'px';
     showFontSizeSelector = false;

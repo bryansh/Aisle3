@@ -49,7 +49,7 @@
 </script>
 
 <BubbleMenu
-	{editor}
+	editor={editor as any}
 	pluginKey="link-menu"
 	shouldShow={(props: ShouldShowProps) => {
 		if (!props.editor.isEditable) return false;

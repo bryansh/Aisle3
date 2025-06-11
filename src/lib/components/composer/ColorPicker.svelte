@@ -48,6 +48,7 @@
             class="w-8 h-8 rounded border-2 border-gray-300 hover:border-gray-500 hover:scale-105 transition-all duration-150 shadow-sm"
             style="background-color: {colorItem.color}; {colorItem.color === '#FFFFFF' ? 'border-color: #d1d5db;' : ''}"
             title={colorItem.name + ' (' + colorItem.color + ')'}
+            aria-label={colorItem.name + ' (' + colorItem.color + ')'}
           ></button>
         {/each}
       </div>

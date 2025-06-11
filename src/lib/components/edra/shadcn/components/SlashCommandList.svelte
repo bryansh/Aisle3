@@ -103,7 +103,7 @@
 			<span class="p-2 text-xs text-muted-foreground">{grp.title}</span>
 
 			{#each grp.commands as command, commandIndex}
-				{@const Icon = icons[command.iconName]}
+				{@const Icon = (icons as any)[command.iconName]}
 				{@const isActive =
 					selectedGroupIndex === groupIndex && selectedCommandIndex === commandIndex}
 				<Button

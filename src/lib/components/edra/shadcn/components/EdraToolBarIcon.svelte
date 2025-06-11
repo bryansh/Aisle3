@@ -16,7 +16,7 @@
 
 	const { class: className = '', command, editor, style, onclick }: Props = $props();
 
-	const Icon = icons[command.iconName];
+	const Icon = (icons as any)[command.iconName];
 	const shortcut = command.shortCuts ? ` (${command.shortCuts[0]})` : '';
 
 	const isActive = $derived.by(() => editor.isActive(command.name) || command.isActive?.(editor));

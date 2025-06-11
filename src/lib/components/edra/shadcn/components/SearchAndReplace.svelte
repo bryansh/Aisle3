@@ -75,7 +75,7 @@
 
 <Popover.Root
 	bind:open
-	onOpenChange={(value) => {
+	onOpenChange={(value: any) => {
 		if (value === false) {
 			clear();
 			updateSearchTerm();

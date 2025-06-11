@@ -201,7 +201,7 @@
 				>
 					<AlignRight class="size-4" />
 				</Button>
-				<DropdownMenu.Root bind:open={openedMore} onOpenChange={(value) => (openedMore = value)}>
+				<DropdownMenu.Root bind:open={openedMore} onOpenChange={(value: any) => (openedMore = value)}>
 					<DropdownMenu.Trigger class={buttonVariants({ variant: 'ghost', class: 'size-6 p-0' })}>
 						<EllipsisVertical class="size-4" />
 					</DropdownMenu.Trigger>
