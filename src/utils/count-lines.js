@@ -1,8 +1,10 @@
 #!/usr/bin/env node
+// @ts-check
 
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import process from 'process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -65,7 +67,7 @@ function countLines(filePath) {
 /**
  * Analyze files and return statistics
  * @param {string[]} files - Array of file paths
- * @returns {Object} Analysis results
+ * @returns {{files: Array<{path: string, lines: number}>, totalLines: number, totalFiles: number}} Analysis results
  */
 function analyzeFiles(files) {
   const results = {

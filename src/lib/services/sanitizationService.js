@@ -52,9 +52,18 @@ const DANGEROUS_PATTERNS = [
  * Email address validation patterns
  */
 const EMAIL_PATTERNS = {
-  basic: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-  rfc5322: /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+  basic: /^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$/,
+  rfc5322: /^[a-zA-Z0-9]([a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$/
 };
+
+/**
+ * Additional validation for edge cases not handled by regex
+ * @param {string} email - Email address to check
+ * @returns {boolean} Whether the email has consecutive dots
+ */
+function hasConsecutiveDots(email) {
+  return email.includes('..');
+}
 
 /**
  * Input sanitization utilities
@@ -63,8 +72,8 @@ export class InputSanitizer {
   /**
    * Sanitize and validate email address
    * @param {string} email - Email address to validate
-   * @param {object} options - Validation options
-   * @returns {object} Validation result with cleaned email
+   * @param {{strict?: boolean, maxLength?: number}} options - Validation options
+   * @returns {{isValid: boolean, cleanEmail: string, error: string|null}} Validation result with cleaned email
    */
   static sanitizeEmail(email, options = {}) {
     const { strict = false, maxLength = 254 } = options;
@@ -76,6 +85,11 @@ export class InputSanitizer {
     // Basic cleanup
     const cleanEmail = email.trim().toLowerCase();
     
+    // Check for empty string after trimming
+    if (cleanEmail.length === 0) {
+      return { isValid: false, cleanEmail: '', error: 'Email must be a string' };
+    }
+    
     // Length check
     if (cleanEmail.length > maxLength) {
       return { isValid: false, cleanEmail, error: `Email too long (max ${maxLength} characters)` };
@@ -83,7 +97,12 @@ export class InputSanitizer {
 
     // Pattern validation
     const pattern = strict ? EMAIL_PATTERNS.rfc5322 : EMAIL_PATTERNS.basic;
-    const isValid = pattern.test(cleanEmail);
+    const passesRegex = pattern.test(cleanEmail);
+    
+    // Additional checks for edge cases
+    const hasConsecutiveDotsIssue = hasConsecutiveDots(cleanEmail);
+    
+    const isValid = passesRegex && !hasConsecutiveDotsIssue;
 
     return {
       isValid,
@@ -95,7 +114,7 @@ export class InputSanitizer {
   /**
    * Sanitize text input by removing potentially dangerous content
    * @param {string} input - Text to sanitize
-   * @param {object} options - Sanitization options
+   * @param {{maxLength?: number, preserveLineBreaks?: boolean, allowBasicFormatting?: boolean}} options - Sanitization options
    * @returns {string} Sanitized text
    */
   static sanitizeText(input, options = {}) {
@@ -137,8 +156,8 @@ export class InputSanitizer {
   /**
    * Sanitize URL to prevent XSS and malicious links
    * @param {string} url - URL to sanitize
-   * @param {object} options - Sanitization options
-   * @returns {object} Sanitization result
+   * @param {{allowedProtocols?: string[], maxLength?: number}} options - Sanitization options
+   * @returns {{isValid: boolean, cleanUrl: string, error: string|null}} Sanitization result
    */
   static sanitizeUrl(url, options = {}) {
     const { allowedProtocols = ['http:', 'https:', 'mailto:'], maxLength = 2048 } = options;
@@ -190,7 +209,7 @@ export class HtmlSanitizer {
   /**
    * Sanitize HTML content by removing dangerous elements and attributes
    * @param {string} html - HTML content to sanitize
-   * @param {object} options - Sanitization options
+   * @param {{allowedTags?: string[], allowedAttributes?: object, maxLength?: number}} options - Sanitization options
    * @returns {string} Sanitized HTML
    */
   static sanitizeHtml(html, options = {}) {
@@ -217,7 +236,7 @@ export class HtmlSanitizer {
     }
 
     // Parse and clean HTML
-    sanitized = this.cleanHtmlTags(sanitized, allowedTags, allowedAttributes);
+    sanitized = this.cleanHtmlTags(sanitized, allowedTags, /** @type {Record<string, string[]>} */ (allowedAttributes));
 
     return sanitized;
   }
@@ -225,7 +244,7 @@ export class HtmlSanitizer {
   /**
    * Remove all HTML tags and return plain text
    * @param {string} html - HTML content
-   * @param {object} options - Options for text extraction
+   * @param {{preserveLineBreaks?: boolean}} options - Options for text extraction
    * @returns {string} Plain text content
    */
   static htmlToText(html, options = {}) {
@@ -267,7 +286,7 @@ export class HtmlSanitizer {
    * Clean HTML tags and attributes
    * @param {string} html - HTML content
    * @param {string[]} allowedTags - Allowed HTML tags
-   * @param {object} allowedAttributes - Allowed attributes by tag
+   * @param {Record<string, string[]>} allowedAttributes - Allowed attributes by tag
    * @returns {string} Cleaned HTML
    */
   static cleanHtmlTags(html, allowedTags, allowedAttributes) {
@@ -343,13 +362,14 @@ export class HtmlSanitizer {
    * @returns {string} Decoded text
    */
   static decodeHtmlEntities(text) {
+    /** @type {Record<string, string>} */
     const entities = {
       '&amp;': '&',
       '&lt;': '<',
       '&gt;': '>',
       '&quot;': '"',
       '&#39;': "'",
-      '&nbsp;': ' '
+      '&nbsp;': '\u00A0' // Use non-breaking space character instead of regular space
     };
 
     return text.replace(/&[a-zA-Z0-9#]+;/g, (entity) => {
@@ -365,8 +385,8 @@ export class ContentValidator {
   /**
    * Validate email content for suspicious patterns
    * @param {string} content - Email content to validate
-   * @param {object} options - Validation options
-   * @returns {object} Validation result
+   * @param {{maxLength?: number, checkPhishing?: boolean, checkSpam?: boolean}} options - Validation options
+   * @returns {{isValid: boolean, issues: string[], riskLevel: string}} Validation result
    */
   static validateEmailContent(content, options = {}) {
     const { 
@@ -440,9 +460,9 @@ export class ContentValidator {
 
   /**
    * Validate file attachment safety
-   * @param {object} file - File object with name, type, size
-   * @param {object} options - Validation options
-   * @returns {object} Validation result
+   * @param {{name?: string, type?: string, size?: number}} file - File object with name, type, size
+   * @param {{maxSize?: number, allowedTypes?: string[], blockedExtensions?: string[]}} options - Validation options
+   * @returns {{isValid: boolean, issues: string[], riskLevel: string}} Validation result
    */
   static validateFileAttachment(file, options = {}) {
     const {
@@ -458,7 +478,7 @@ export class ContentValidator {
     }
 
     // Size check
-    if (file.size > maxSize) {
+    if (file.size && file.size > maxSize) {
       issues.push(`File too large (${Math.round(file.size / 1024 / 1024)}MB > ${Math.round(maxSize / 1024 / 1024)}MB)`);
     }
 
@@ -496,15 +516,15 @@ export class SanitizationService {
 
   /**
    * Sanitize email compose data
-   * @param {object} emailData - Email data to sanitize
-   * @returns {object} Sanitized email data with validation results
+   * @param {{to?: string, subject?: string, body?: string}} emailData - Email data to sanitize
+   * @returns {{sanitizedData: any, validationResults: any, isValid: boolean, issues: string[]}} Sanitized email data with validation results
    */
   sanitizeEmailData(emailData) {
     const result = {
-      sanitizedData: {},
-      validationResults: {},
+      sanitizedData: /** @type {any} */ ({}),
+      validationResults: /** @type {any} */ ({}),
       isValid: true,
-      issues: []
+      issues: /** @type {string[]} */ ([])
     };
 
     // Sanitize recipient email
@@ -560,15 +580,15 @@ export class SanitizationService {
 
   /**
    * Sanitize email display content (incoming emails)
-   * @param {object} email - Email object to sanitize for display
-   * @returns {object} Sanitized email
+   * @param {any} email - Email object to sanitize for display
+   * @returns {any} Sanitized email
    */
   sanitizeEmailForDisplay(email) {
     if (!email || typeof email !== 'object') {
       return null;
     }
 
-    const sanitized = { ...email };
+    const sanitized = /** @type {any} */ ({ ...email });
 
     // Sanitize sender
     if (sanitized.sender) {

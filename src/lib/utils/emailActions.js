@@ -1,6 +1,7 @@
 /**
  * Email Action Utilities - Comprehensive utilities for email operations
  * Provides high-level abstractions for common email actions
+ * @fileoverview Email action utilities with enhanced error handling and batch processing
  */
 
 /**
@@ -31,22 +32,24 @@ export class EmailValidation {
 
   /**
    * Validate email content structure
-   * @param {object} email - Email object to validate
+   * @param {any} email - Email object to validate
    * @returns {boolean} Whether the email structure is valid
    */
   static isValidEmail(email) {
-    return email && 
-           typeof email === 'object' && 
-           email.id && 
-           typeof email.subject === 'string' &&
-           typeof email.sender === 'string';
+    if (!email || typeof email !== 'object') {
+      return false;
+    }
+    
+    return Boolean(email.id && 
+                   typeof email.subject === 'string' &&
+                   typeof email.sender === 'string');
   }
 
   /**
    * Validate bulk action parameters
    * @param {string[]} emailIds - Array of email IDs
    * @param {string} action - Action type
-   * @returns {object} Validation result with isValid and errors
+   * @returns {{isValid: boolean, errors: string[]}} Validation result with isValid and errors
    */
   static validateBulkAction(emailIds, action) {
     const errors = [];
@@ -77,6 +80,12 @@ export class EmailValidation {
  * Email action result builder for consistent response format
  */
 export class EmailActionResult {
+  /**
+   * @param {string} action
+   * @param {boolean} success
+   * @param {any} data
+   * @param {string|Error|null} error
+   */
   constructor(action, success = true, data = null, error = null) {
     this.action = action;
     this.success = success;
@@ -120,7 +129,7 @@ export class EmailBatchProcessor {
    * Process emails in batches with configurable delay
    * @param {string[]} emailIds - Array of email IDs
    * @param {Function} processor - Function to process each email
-   * @param {Function} onProgress - Progress callback (optional)
+   * @param {Function|null} onProgress - Progress callback (optional)
    * @returns {Promise<EmailActionResult[]>}
    */
   async processBatch(emailIds, processor, onProgress = null) {
@@ -134,12 +143,12 @@ export class EmailBatchProcessor {
           const result = await processor(emailId);
           return EmailActionResult.success('batch_item', { emailId, result });
         } catch (error) {
-          return EmailActionResult.error('batch_item', error, { emailId });
+          return EmailActionResult.error('batch_item', /** @type {Error} */ (error), { emailId });
         }
       });
 
       const batchResults = await Promise.allSettled(batchPromises);
-      results.push(...batchResults.map(r => r.value || r.reason));
+      results.push(...batchResults.map(r => r.status === 'fulfilled' ? r.value : r.reason));
 
       // Progress callback
       if (onProgress) {
@@ -187,6 +196,10 @@ export class EmailBatchProcessor {
  * Email action utilities with enhanced error handling and logging
  */
 export class EmailActionUtils {
+  /**
+   * @param {any} emailService
+   * @param {any} logger
+   */
   constructor(emailService, logger = console) {
     this.emailService = emailService;
     this.logger = logger;
@@ -196,7 +209,7 @@ export class EmailActionUtils {
   /**
    * Mark multiple emails as read with batch processing
    * @param {string[]} emailIds - Array of email IDs
-   * @param {object} options - Options for batch processing
+   * @param {any} options - Options for batch processing
    * @returns {Promise<EmailActionResult>}
    */
   async markMultipleAsRead(emailIds, options = {}) {
@@ -210,7 +223,7 @@ export class EmailActionUtils {
       
       const results = await this.batchProcessor.processBatch(
         emailIds,
-        (emailId) => this.emailService.markAsRead(emailId),
+        /** @param {string} emailId */ (emailId) => this.emailService.markAsRead(emailId),
         options.onProgress
       );
 
@@ -228,14 +241,14 @@ export class EmailActionUtils {
       });
     } catch (error) {
       this.logger.error('Bulk mark as read failed:', error);
-      return EmailActionResult.error(EmailActionTypes.BULK_ACTION, error);
+      return EmailActionResult.error(EmailActionTypes.BULK_ACTION, /** @type {Error} */ (error));
     }
   }
 
   /**
    * Mark multiple emails as unread with batch processing
    * @param {string[]} emailIds - Array of email IDs
-   * @param {object} options - Options for batch processing
+   * @param {any} options - Options for batch processing
    * @returns {Promise<EmailActionResult>}
    */
   async markMultipleAsUnread(emailIds, options = {}) {
@@ -249,7 +262,7 @@ export class EmailActionUtils {
       
       const results = await this.batchProcessor.processBatch(
         emailIds,
-        (emailId) => this.emailService.markAsUnread(emailId),
+        /** @param {string} emailId */ (emailId) => this.emailService.markAsUnread(emailId),
         options.onProgress
       );
 
@@ -267,7 +280,7 @@ export class EmailActionUtils {
       });
     } catch (error) {
       this.logger.error('Bulk mark as unread failed:', error);
-      return EmailActionResult.error(EmailActionTypes.BULK_ACTION, error);
+      return EmailActionResult.error(EmailActionTypes.BULK_ACTION, /** @type {Error} */ (error));
     }
   }
 
@@ -275,7 +288,7 @@ export class EmailActionUtils {
    * Enhanced reply with validation and error handling
    * @param {string} originalEmailId - Original email ID
    * @param {string} replyBody - Reply content
-   * @param {object} options - Reply options
+   * @param {any} options - Reply options
    * @returns {Promise<EmailActionResult>}
    */
   async sendReplyWithValidation(originalEmailId, replyBody, options = {}) {
@@ -301,13 +314,13 @@ export class EmailActionUtils {
       });
     } catch (error) {
       this.logger.error('Reply failed:', error);
-      return EmailActionResult.error(EmailActionTypes.SEND_REPLY, error, { originalEmailId });
+      return EmailActionResult.error(EmailActionTypes.SEND_REPLY, /** @type {Error} */ (error), { originalEmailId });
     }
   }
 
   /**
    * Refresh emails with enhanced error handling and caching
-   * @param {object} options - Refresh options
+   * @param {any} options - Refresh options
    * @returns {Promise<EmailActionResult>}
    */
   async refreshEmailsWithCache(options = {}) {
@@ -337,13 +350,13 @@ export class EmailActionUtils {
       });
     } catch (error) {
       this.logger.error('Email refresh failed:', error);
-      return EmailActionResult.error(EmailActionTypes.REFRESH, error);
+      return EmailActionResult.error(EmailActionTypes.REFRESH, /** @type {Error} */ (error));
     }
   }
 
   /**
    * Check for new emails with smart polling
-   * @param {object} options - Polling options
+   * @param {any} options - Polling options
    * @returns {Promise<EmailActionResult>}
    */
   async checkForNewEmailsSmart(options = {}) {
@@ -375,7 +388,7 @@ export class EmailActionUtils {
       });
     } catch (error) {
       this.logger.error('Check for new emails failed:', error);
-      return EmailActionResult.error('check_new_emails', error);
+      return EmailActionResult.error('check_new_emails', /** @type {Error} */ (error));
     }
   }
 
@@ -396,8 +409,8 @@ export class EmailActionUtils {
 
 /**
  * Factory function to create email action utilities
- * @param {object} emailService - Email service instance
- * @param {object} options - Configuration options
+ * @param {any} emailService - Email service instance
+ * @param {any} options - Configuration options
  * @returns {EmailActionUtils}
  */
 export function createEmailActionUtils(emailService, options = {}) {
