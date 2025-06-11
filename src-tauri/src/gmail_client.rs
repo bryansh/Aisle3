@@ -309,19 +309,22 @@ impl GmailClient {
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         // Detect if body contains HTML
         let is_html = body.contains('<') && (body.contains("</") || body.contains("/>"));
-        
+
         // Create the email message in RFC 2822 format
         let mut email_content = String::new();
-        
+
         email_content.push_str(&format!("To: {}\r\n", to));
         email_content.push_str(&format!("Subject: {}\r\n", subject));
         email_content.push_str("MIME-Version: 1.0\r\n");
-        
+
         if is_html {
             // Multipart email with both plain text and HTML
             let boundary = "boundary_email_content_12345";
-            email_content.push_str(&format!("Content-Type: multipart/alternative; boundary=\"{}\"\r\n", boundary));
-            
+            email_content.push_str(&format!(
+                "Content-Type: multipart/alternative; boundary=\"{}\"\r\n",
+                boundary
+            ));
+
             // Add reply headers if this is a reply
             if let Some(reply_to) = in_reply_to {
                 email_content.push_str(&format!("In-Reply-To: {}\r\n", reply_to));
@@ -329,14 +332,14 @@ impl GmailClient {
             if let Some(refs) = references {
                 email_content.push_str(&format!("References: {}\r\n", refs));
             }
-            
+
             email_content.push_str("\r\n"); // Empty line to separate headers from body
-            
+
             // Plain text part (strip HTML for plain text version)
             email_content.push_str(&format!("--{}\r\n", boundary));
             email_content.push_str("Content-Type: text/plain; charset=utf-8\r\n");
             email_content.push_str("Content-Transfer-Encoding: 7bit\r\n\r\n");
-            
+
             // Simple HTML to text conversion (remove tags)
             let plain_text = body
                 .replace("<br>", "\n")
@@ -345,7 +348,7 @@ impl GmailClient {
                 .replace("</p>", "\n\n")
                 .replace("</div>", "\n")
                 .replace("</li>", "\n");
-            
+
             // Remove all HTML tags with regex-like replacement
             let mut plain_body = String::new();
             let mut in_tag = false;
@@ -357,23 +360,23 @@ impl GmailClient {
                     _ => {}
                 }
             }
-            
+
             email_content.push_str(&plain_body.trim());
             email_content.push_str("\r\n\r\n");
-            
+
             // HTML part
             email_content.push_str(&format!("--{}\r\n", boundary));
             email_content.push_str("Content-Type: text/html; charset=utf-8\r\n");
             email_content.push_str("Content-Transfer-Encoding: 7bit\r\n\r\n");
             email_content.push_str(body);
             email_content.push_str("\r\n\r\n");
-            
+
             // End boundary
             email_content.push_str(&format!("--{}--\r\n", boundary));
         } else {
             // Plain text email
             email_content.push_str("Content-Type: text/plain; charset=utf-8\r\n");
-            
+
             // Add reply headers if this is a reply
             if let Some(reply_to) = in_reply_to {
                 email_content.push_str(&format!("In-Reply-To: {}\r\n", reply_to));
@@ -381,7 +384,7 @@ impl GmailClient {
             if let Some(refs) = references {
                 email_content.push_str(&format!("References: {}\r\n", refs));
             }
-            
+
             email_content.push_str("\r\n"); // Empty line to separate headers from body
             email_content.push_str(body);
         }
@@ -410,7 +413,10 @@ impl GmailClient {
         }
 
         let response_json: serde_json::Value = response.json().await?;
-        let message_id = response_json["id"].as_str().unwrap_or("unknown").to_string();
+        let message_id = response_json["id"]
+            .as_str()
+            .unwrap_or("unknown")
+            .to_string();
 
         Ok(message_id)
     }

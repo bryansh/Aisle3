@@ -415,7 +415,7 @@ async fn send_reply(
 
     // Extract sender email from "From" header
     let original_sender = original_email.get_from();
-    
+
     // Parse email from "Name <email@domain.com>" format
     let to_email = if let Some(start) = original_sender.find('<') {
         if let Some(end) = original_sender.find('>') {
@@ -438,7 +438,7 @@ async fn send_reply(
     // Get message threading headers
     let message_id = original_email.get_message_id();
     let references = original_email.get_references();
-    
+
     // Build references chain for proper threading
     let reply_references = match (message_id.as_ref(), references.as_ref()) {
         (Some(msg_id), Some(refs)) => Some(format!("{} {}", refs, msg_id)),
@@ -457,7 +457,10 @@ async fn send_reply(
         )
         .await
     {
-        Ok(message_id) => Ok(format!("Reply sent successfully! Message ID: {}", message_id)),
+        Ok(message_id) => Ok(format!(
+            "Reply sent successfully! Message ID: {}",
+            message_id
+        )),
         Err(e) => Err(format!("Failed to send reply: {}", e)),
     }
 }
