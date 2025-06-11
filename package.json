@@ -32,7 +32,9 @@
     "test:e2e:ui": "playwright test --ui --config=playwright.config.js",
     "test:e2e:headed": "playwright test --config=playwright.config.js --headed",
     "test:e2e:debug": "playwright test --config=playwright.config.js --debug",
-    "test:playwright:install": "playwright install"
+    "test:playwright:install": "playwright install",
+    "count-lines": "node src/utils/count-lines.js",
+    "count-lines:detailed": "node src/utils/count-lines.js --detailed"
   },
   "license": "MIT",
   "dependencies": {
