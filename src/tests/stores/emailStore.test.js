@@ -245,7 +245,7 @@ describe('EmailStore', () => {
 
   describe('Loading States', () => {
     it('manages loading email states through store', () => {
-      const currentLoadingStates = get(loadingEmailStates);
+      const currentLoadingStates = get(loadingEmailStates.store);
       
       // Initially should be empty
       expect(currentLoadingStates.size).toBe(0);
@@ -253,6 +253,11 @@ describe('EmailStore', () => {
       // Loading states are managed internally by the store operations
       // We can test that the store exists and is accessible
       expect(currentLoadingStates instanceof Set).toBe(true);
+      
+      // Test the helper functions
+      expect(typeof loadingEmailStates.add).toBe('function');
+      expect(typeof loadingEmailStates.remove).toBe('function');
+      expect(typeof loadingEmailStates.has).toBe('function');
     });
   });
 

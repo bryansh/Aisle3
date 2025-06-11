@@ -1,12 +1,17 @@
 import { writable, derived } from 'svelte/store';
 import { emailService } from '../services/emailService.js';
+import { useLoadingState, useSetLoadingState, LOADING_KEYS, createAsyncOperation, createAsyncOperationWithId } from '../utils/loading.js';
 
 // Core email state
 /** @type {import('svelte/store').Writable<any[]>} */
 export const emails = writable([]);
 export const totalCount = writable(0);
 export const unreadCount = writable(0);
-export const loading = writable(false);
+
+// Loading states using shared utilities
+export const loading = useLoadingState(LOADING_KEYS.EMAIL_LIST);
+export const loadingEmail = useLoadingState(LOADING_KEYS.EMAIL_CONTENT);
+export const loadingEmailStates = useSetLoadingState(LOADING_KEYS.EMAIL_OPERATIONS);
 
 // View state
 export const viewMode = writable('emails'); // 'emails' | 'conversations'
@@ -15,14 +20,10 @@ export const showSingleMessageThreads = writable(false);
 // Selected items
 export const selectedEmail = writable(null);
 export const selectedConversation = writable(null);
-export const loadingEmail = writable(false);
 
 // UI state
 export const showEmailView = writable(false);
 export const showSettings = writable(false);
-
-// Loading states for individual operations
-export const loadingEmailStates = writable(new Set());
 
 // Derived stores
 export const conversations = derived(
@@ -47,25 +48,25 @@ export const conversationStats = derived(
   }
 );
 
+// Create async operation wrappers
+const loadEmailsWithLoading = createAsyncOperation(loading);
+const loadEmailContentWithLoading = createAsyncOperation(loadingEmail);
+
 // Email operations
 export const emailOperations = {
   async loadEmails() {
-    loading.set(true);
-    try {
+    return loadEmailsWithLoading(async () => {
       const emailData = await emailService.loadEmails();
       emails.set(emailData);
-    } catch (error) {
-      console.error('Error loading emails:', error);
-      throw error;
-    } finally {
-      loading.set(false);
-    }
+      return emailData;
+    });
   },
 
   async loadEmailsInBackground() {
     try {
       const emailData = await emailService.loadEmailsInBackground();
       emails.set(emailData);
+      return emailData;
     } catch (error) {
       console.error('Error loading emails in background:', error);
       throw error;
@@ -77,6 +78,7 @@ export const emailOperations = {
       const stats = await emailService.loadStats();
       totalCount.set(stats.totalCount);
       unreadCount.set(stats.unreadCount);
+      return stats;
     } catch (error) {
       console.error('Error loading stats:', error);
       throw error;
@@ -88,6 +90,7 @@ export const emailOperations = {
       const stats = await emailService.loadStatsInBackground();
       totalCount.set(stats.totalCount);
       unreadCount.set(stats.unreadCount);
+      return stats;
     } catch (error) {
       console.error('Error loading stats in background:', error);
       throw error;
@@ -98,18 +101,12 @@ export const emailOperations = {
    * @param {string} emailId
    */
   async getEmailContent(emailId) {
-    loadingEmail.set(true);
-    try {
+    return loadEmailContentWithLoading(async () => {
       const emailContent = await emailService.getEmailContent(emailId);
       selectedEmail.set(emailContent);
       showEmailView.set(true);
       return emailContent;
-    } catch (error) {
-      console.error('Error loading email content:', error);
-      throw error;
-    } finally {
-      loadingEmail.set(false);
-    }
+    });
   },
 
   /**
@@ -117,38 +114,39 @@ export const emailOperations = {
    * @param {boolean} isAutomatic - Whether this is an automatic marking
    */
   async markAsRead(emailId, isAutomatic = false) {
-    // Don't show loading spinner for automatic marking
+    // Use set-based loading for non-automatic operations
     if (!isAutomatic) {
-      loadingEmailStates.update(set => {
-        const newSet = new Set(set);
-        newSet.add(emailId);
-        return newSet;
+      const markAsReadWithLoading = createAsyncOperationWithId(loadingEmailStates, emailId);
+      return markAsReadWithLoading(async () => {
+        await emailService.markAsRead(emailId, isAutomatic);
+        
+        // Update emails store
+        emails.update(/** @param {any[]} emailList */ emailList => 
+          emailList.map(/** @param {any} email */ email => 
+            email.id === emailId ? { ...email, is_read: true } : email
+          )
+        );
+
+        // Update stats
+        await this.loadStatsInBackground();
       });
-    }
+    } else {
+      // For automatic marking, don't show loading indicator
+      try {
+        await emailService.markAsRead(emailId, isAutomatic);
+        
+        // Update emails store
+        emails.update(/** @param {any[]} emailList */ emailList => 
+          emailList.map(/** @param {any} email */ email => 
+            email.id === emailId ? { ...email, is_read: true } : email
+          )
+        );
 
-    try {
-      await emailService.markAsRead(emailId, isAutomatic);
-      
-      // Update emails store
-      emails.update(/** @param {any[]} emailList */ emailList => 
-        emailList.map(/** @param {any} email */ email => 
-          email.id === emailId ? { ...email, is_read: true } : email
-        )
-      );
-
-      // Update stats
-      await this.loadStatsInBackground();
-    } catch (error) {
-      console.error('Error marking email as read:', error);
-      throw error;
-    } finally {
-      // Remove from loading set (only if we added it)
-      if (!isAutomatic) {
-        loadingEmailStates.update(set => {
-          const newSet = new Set(set);
-          newSet.delete(emailId);
-          return newSet;
-        });
+        // Update stats
+        await this.loadStatsInBackground();
+      } catch (error) {
+        console.error('Error marking email as read:', error);
+        throw error;
       }
     }
   },
@@ -193,14 +191,8 @@ export const emailOperations = {
    * @param {string} emailId
    */
   async markAsUnread(emailId) {
-    // Add to loading set
-    loadingEmailStates.update(set => {
-      const newSet = new Set(set);
-      newSet.add(emailId);
-      return newSet;
-    });
-
-    try {
+    const markAsUnreadWithLoading = createAsyncOperationWithId(loadingEmailStates, emailId);
+    return markAsUnreadWithLoading(async () => {
       await emailService.markAsUnread(emailId);
       
       // Update emails store
@@ -212,17 +204,7 @@ export const emailOperations = {
 
       // Update stats
       await this.loadStatsInBackground();
-    } catch (error) {
-      console.error('Error marking email as unread:', error);
-      throw error;
-    } finally {
-      // Remove from loading set
-      loadingEmailStates.update(set => {
-        const newSet = new Set(set);
-        newSet.delete(emailId);
-        return newSet;
-      });
-    }
+    });
   },
 
   async checkForNewEmails(useBackgroundLoading = false) {

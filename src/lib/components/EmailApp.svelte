@@ -255,7 +255,7 @@
             onEmailSelect={handleEmailSelect}
             onMarkAsRead={emailOperations.markAsRead}
             onMarkAsUnread={emailOperations.markAsUnread}
-            loadingEmailStates={$loadingEmailStates}
+            loadingEmailStates={loadingEmailStates}
             {decode}
           />
         {:else if $selectedEmail}
@@ -316,7 +316,7 @@
             onEmailSelect={handleEmailSelect}
             onMarkAsRead={emailOperations.markAsRead}
             onMarkAsUnread={emailOperations.markAsUnread}
-            loadingEmailStates={$loadingEmailStates}
+            loadingEmailStates={loadingEmailStates}
           />
         {/if}
       {/if}

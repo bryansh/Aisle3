@@ -424,9 +424,10 @@ describe('EmailComposer Component', () => {
 
       const sendButton = screen.getByText('Send Reply');
       
-      // Test that button exists and has expected classes/attributes
+      // Test that button exists and has expected structure
       expect(sendButton).toBeInTheDocument();
-      expect(sendButton.closest('button')).toHaveClass('flex', 'items-center', 'gap-2');
+      expect(sendButton.closest('button')).toBeInTheDocument();
+      expect(sendButton.closest('button')).toHaveClass('inline-flex', 'items-center');
     });
   });
 

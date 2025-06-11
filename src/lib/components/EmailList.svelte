@@ -18,7 +18,7 @@
     onEmailSelect: (email: Email) => void;
     onMarkAsRead: (emailId: string) => Promise<void>;
     onMarkAsUnread: (emailId: string) => Promise<void>;
-    loadingEmailStates: Set<string>;
+    loadingEmailStates: { has: (id: string) => boolean };
   }
 
   let { 
