@@ -6,7 +6,6 @@ export default defineConfig({
     svelte({
       hot: !process.env.VITEST,
       compilerOptions: {
-        // Ensure Svelte components work in test environment
         hydratable: true,
         css: 'injected'
       }
@@ -14,9 +13,10 @@ export default defineConfig({
   ],
   test: {
     globals: true,
-    environment: 'happy-dom',
+    environment: 'jsdom',
     setupFiles: ['./src/setupTests.js'],
     include: ['src/**/*.{test,spec}.{js,ts}'],
+    exclude: ['src/tests/playwright/**'],
     coverage: {
       reporter: ['text', 'json', 'html'],
       exclude: [
@@ -26,10 +26,16 @@ export default defineConfig({
         '**/*.test.js'
       ]
     },
-    // Force client-side rendering for Svelte 5
+    // Ensure proper client-side rendering for Svelte 5
     server: {
       deps: {
-        inline: ['svelte']
+        inline: ['svelte', '@sveltejs/kit', '@testing-library/svelte']
+      }
+    },
+    // Force browser environment
+    environmentOptions: {
+      jsdom: {
+        resources: 'usable'
       }
     }
   },
@@ -37,6 +43,15 @@ export default defineConfig({
     alias: {
       '$lib': '/src/lib',
       '$app': '/src/app'
-    }
+    },
+    conditions: ['browser']
+  },
+  define: {
+    // Force browser mode for Svelte components
+    'process.env.NODE_ENV': '"test"',
+    'global': 'globalThis'
+  },
+  esbuild: {
+    target: 'node14'
   }
 });

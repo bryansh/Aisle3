@@ -53,7 +53,7 @@
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div 
-          class="cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-blue-300 transform hover:-translate-y-1 {!email.is_read ? 'border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-50 to-white' : 'bg-white hover:bg-gray-50'} rounded-lg border border-gray-200 shadow-sm"
+          class="cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-blue-300 transform hover:-translate-y-1 {!email.is_read ? 'border-l-4 border-l-blue-500 bg-white border-blue-200 shadow-md' : 'bg-gray-50 border-gray-300 hover:bg-gray-100'} rounded-lg border shadow-sm"
           onclick={() => onEmailSelect(email)}
         >
           <div class="p-5">
@@ -62,10 +62,10 @@
                 {#if !email.is_read}
                   <Badge color="blue" class="mr-2 flex-shrink-0">New</Badge>
                 {/if}
-                <span class="font-semibold text-gray-900 truncate max-w-xs mr-4">
+                <span class="truncate max-w-xs mr-4 {!email.is_read ? 'font-bold text-gray-900' : 'font-medium text-gray-600'}">
                   {email.sender}
                 </span>
-                <span class="text-gray-700 truncate flex-1 font-medium">
+                <span class="truncate flex-1 {!email.is_read ? 'font-bold text-gray-900' : 'font-normal text-gray-600'}">
                   {email.subject}
                 </span>
               </div>
@@ -88,7 +88,7 @@
                 </Button>
               </div>
             </div>
-            <p class="text-sm text-gray-500 truncate m-0 leading-relaxed">
+            <p class="text-sm truncate m-0 leading-relaxed {!email.is_read ? 'text-gray-700 font-medium' : 'text-gray-500 font-normal'}">
               {email.snippet}
             </p>
           </div>

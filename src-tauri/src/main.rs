@@ -395,6 +395,74 @@ async fn mark_email_as_unread(
 }
 
 #[tauri::command]
+async fn send_reply(
+    original_email_id: String,
+    reply_body: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let tokens = match refresh_tokens_if_needed(&state).await {
+        Ok(tokens) => tokens,
+        Err(e) => return Err(format!("Authentication required: {}", e)),
+    };
+
+    let gmail_client = GmailClient::new(&tokens);
+
+    // Get the original email to extract reply information
+    let original_email = gmail_client
+        .get_message(&original_email_id)
+        .await
+        .map_err(|e| format!("Failed to get original email: {}", e))?;
+
+    // Extract sender email from "From" header
+    let original_sender = original_email.get_from();
+    
+    // Parse email from "Name <email@domain.com>" format
+    let to_email = if let Some(start) = original_sender.find('<') {
+        if let Some(end) = original_sender.find('>') {
+            original_sender[start + 1..end].to_string()
+        } else {
+            original_sender
+        }
+    } else {
+        original_sender
+    };
+
+    // Create reply subject
+    let original_subject = original_email.get_subject();
+    let reply_subject = if original_subject.starts_with("Re: ") {
+        original_subject
+    } else {
+        format!("Re: {}", original_subject)
+    };
+
+    // Get message threading headers
+    let message_id = original_email.get_message_id();
+    let references = original_email.get_references();
+    
+    // Build references chain for proper threading
+    let reply_references = match (message_id.as_ref(), references.as_ref()) {
+        (Some(msg_id), Some(refs)) => Some(format!("{} {}", refs, msg_id)),
+        (Some(msg_id), None) => Some(msg_id.clone()),
+        _ => None,
+    };
+
+    // Send the reply
+    match gmail_client
+        .send_email(
+            &to_email,
+            &reply_subject,
+            &reply_body,
+            message_id.as_deref(),
+            reply_references.as_deref(),
+        )
+        .await
+    {
+        Ok(message_id) => Ok(format!("Reply sent successfully! Message ID: {}", message_id)),
+        Err(e) => Err(format!("Failed to send reply: {}", e)),
+    }
+}
+
+#[tauri::command]
 async fn check_for_new_emails_since_last_check(
     state: State<'_, AppState>,
 ) -> Result<Vec<String>, String> {
@@ -428,10 +496,6 @@ async fn check_for_new_emails_since_last_check(
 
             *state.last_check_time.lock().unwrap() = Some(current_time);
 
-            println!(
-                "📧 Found {} new emails since last check",
-                new_email_ids.len()
-            );
             Ok(new_email_ids)
         }
         Err(e) => {
@@ -465,7 +529,8 @@ fn main() {
             get_email_content,
             check_for_new_emails_since_last_check,
             mark_email_as_read,
-            mark_email_as_unread
+            mark_email_as_unread,
+            send_reply
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

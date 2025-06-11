@@ -40,17 +40,29 @@
   let pollingIntervalSeconds = $state(30);
   let pollingInterval: number | null = $state(null);
 
+  // Auto-mark read state
+  let autoMarkReadEnabled = $state(true);
+  let autoMarkReadDelay = $state(1500);
+
   // Load settings from localStorage
   const loadSettings = () => {
     if (typeof window !== 'undefined') {
       const savedAutoPolling = localStorage.getItem('autoPollingEnabled');
       const savedInterval = localStorage.getItem('pollingIntervalSeconds');
+      const savedAutoMarkRead = localStorage.getItem('autoMarkReadEnabled');
+      const savedAutoMarkReadDelay = localStorage.getItem('autoMarkReadDelay');
       
       if (savedAutoPolling !== null) {
         autoPollingEnabled = JSON.parse(savedAutoPolling);
       }
       if (savedInterval !== null) {
         pollingIntervalSeconds = parseInt(savedInterval, 10);
+      }
+      if (savedAutoMarkRead !== null) {
+        autoMarkReadEnabled = JSON.parse(savedAutoMarkRead);
+      }
+      if (savedAutoMarkReadDelay !== null) {
+        autoMarkReadDelay = parseInt(savedAutoMarkReadDelay, 10);
       }
     }
   };
@@ -60,6 +72,8 @@
     if (typeof window !== 'undefined') {
       localStorage.setItem('autoPollingEnabled', JSON.stringify(autoPollingEnabled));
       localStorage.setItem('pollingIntervalSeconds', pollingIntervalSeconds.toString());
+      localStorage.setItem('autoMarkReadEnabled', JSON.stringify(autoMarkReadEnabled));
+      localStorage.setItem('autoMarkReadDelay', autoMarkReadDelay.toString());
     }
   };
 
@@ -167,6 +181,32 @@
     await emailOperations.checkForNewEmails(false);
   };
 
+  // Reply handling
+  const handleEmailReply = async (replyBody: string) => {
+    const email = $selectedEmail as any;
+    if (email && email.id) {
+      try {
+        await emailOperations.sendReply(email.id, replyBody);
+        console.log('✅ Reply sent successfully!');
+        
+        // Optionally refresh emails in background to show the sent reply
+        await emailOperations.loadEmailsInBackground();
+      } catch (error) {
+        console.error('❌ Failed to send reply:', error);
+        throw error; // Re-throw to let the composer handle the error
+      }
+    }
+  };
+
+  // Auto-mark read settings handlers
+  const handleToggleAutoMarkRead = () => {
+    saveSettings();
+  };
+
+  const handleAutoMarkReadDelayChanged = () => {
+    saveSettings();
+  };
+
   // DOMPurify function
   function sanitizeEmailHtml(html: string): string {
     if (!html) return '';
@@ -222,14 +262,20 @@
           <EmailViewer 
             email={$selectedEmail}
             {sanitizeEmailHtml}
+            autoMarkReadDelay={autoMarkReadEnabled ? autoMarkReadDelay : 0}
+            onReply={handleEmailReply}
           />
         {/if}
       {:else if $showSettings}
         <Settings 
           bind:autoPollingEnabled
           bind:pollingInterval={pollingIntervalSeconds}
+          bind:autoMarkReadEnabled
+          bind:autoMarkReadDelay
           onToggleAutoPolling={handleToggleAutoPolling}
           onIntervalChanged={handleIntervalChanged}
+          onToggleAutoMarkRead={handleToggleAutoMarkRead}
+          onAutoMarkReadDelayChanged={handleAutoMarkReadDelayChanged}
           onCheckNow={handleCheckNow}
         />
       {:else}

@@ -299,6 +299,122 @@ impl GmailClient {
         Ok(message_ids)
     }
 
+    pub async fn send_email(
+        &self,
+        to: &str,
+        subject: &str,
+        body: &str,
+        in_reply_to: Option<&str>,
+        references: Option<&str>,
+    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+        // Detect if body contains HTML
+        let is_html = body.contains('<') && (body.contains("</") || body.contains("/>"));
+        
+        // Create the email message in RFC 2822 format
+        let mut email_content = String::new();
+        
+        email_content.push_str(&format!("To: {}\r\n", to));
+        email_content.push_str(&format!("Subject: {}\r\n", subject));
+        email_content.push_str("MIME-Version: 1.0\r\n");
+        
+        if is_html {
+            // Multipart email with both plain text and HTML
+            let boundary = "boundary_email_content_12345";
+            email_content.push_str(&format!("Content-Type: multipart/alternative; boundary=\"{}\"\r\n", boundary));
+            
+            // Add reply headers if this is a reply
+            if let Some(reply_to) = in_reply_to {
+                email_content.push_str(&format!("In-Reply-To: {}\r\n", reply_to));
+            }
+            if let Some(refs) = references {
+                email_content.push_str(&format!("References: {}\r\n", refs));
+            }
+            
+            email_content.push_str("\r\n"); // Empty line to separate headers from body
+            
+            // Plain text part (strip HTML for plain text version)
+            email_content.push_str(&format!("--{}\r\n", boundary));
+            email_content.push_str("Content-Type: text/plain; charset=utf-8\r\n");
+            email_content.push_str("Content-Transfer-Encoding: 7bit\r\n\r\n");
+            
+            // Simple HTML to text conversion (remove tags)
+            let plain_text = body
+                .replace("<br>", "\n")
+                .replace("<br/>", "\n")
+                .replace("<br />", "\n")
+                .replace("</p>", "\n\n")
+                .replace("</div>", "\n")
+                .replace("</li>", "\n");
+            
+            // Remove all HTML tags with regex-like replacement
+            let mut plain_body = String::new();
+            let mut in_tag = false;
+            for ch in plain_text.chars() {
+                match ch {
+                    '<' => in_tag = true,
+                    '>' => in_tag = false,
+                    _ if !in_tag => plain_body.push(ch),
+                    _ => {}
+                }
+            }
+            
+            email_content.push_str(&plain_body.trim());
+            email_content.push_str("\r\n\r\n");
+            
+            // HTML part
+            email_content.push_str(&format!("--{}\r\n", boundary));
+            email_content.push_str("Content-Type: text/html; charset=utf-8\r\n");
+            email_content.push_str("Content-Transfer-Encoding: 7bit\r\n\r\n");
+            email_content.push_str(body);
+            email_content.push_str("\r\n\r\n");
+            
+            // End boundary
+            email_content.push_str(&format!("--{}--\r\n", boundary));
+        } else {
+            // Plain text email
+            email_content.push_str("Content-Type: text/plain; charset=utf-8\r\n");
+            
+            // Add reply headers if this is a reply
+            if let Some(reply_to) = in_reply_to {
+                email_content.push_str(&format!("In-Reply-To: {}\r\n", reply_to));
+            }
+            if let Some(refs) = references {
+                email_content.push_str(&format!("References: {}\r\n", refs));
+            }
+            
+            email_content.push_str("\r\n"); // Empty line to separate headers from body
+            email_content.push_str(body);
+        }
+
+        // Encode the email content in base64 URL-safe format
+        let encoded_email = URL_SAFE.encode(email_content.as_bytes());
+
+        // Create the request payload
+        let send_request = serde_json::json!({
+            "raw": encoded_email
+        });
+
+        let url = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
+
+        let response = self
+            .client
+            .post(url)
+            .bearer_auth(&self.access_token)
+            .json(&send_request)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await?;
+            return Err(format!("Gmail send API error: {}", error_text).into());
+        }
+
+        let response_json: serde_json::Value = response.json().await?;
+        let message_id = response_json["id"].as_str().unwrap_or("unknown").to_string();
+
+        Ok(message_id)
+    }
+
     pub async fn mark_as_read(
         &self,
         message_id: &str,
@@ -372,6 +488,14 @@ impl GmailMessage {
 
     pub fn get_date(&self) -> Option<String> {
         self.get_header("Date")
+    }
+
+    pub fn get_message_id(&self) -> Option<String> {
+        self.get_header("Message-ID")
+    }
+
+    pub fn get_references(&self) -> Option<String> {
+        self.get_header("References")
     }
 
     pub fn is_unread(&self) -> bool {

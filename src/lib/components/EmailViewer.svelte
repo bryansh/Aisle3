@@ -1,7 +1,10 @@
 <script lang="ts">
   import { fade } from 'svelte/transition';
-  import { Card } from 'flowbite-svelte';
-  import { onMount } from 'svelte';
+  import { Card, Button } from 'flowbite-svelte';
+  import { Reply } from 'lucide-svelte';
+  import { onMount, onDestroy } from 'svelte';
+  import { emailOperations } from '../stores/emailStore.js';
+  import EmailComposer from './EmailComposer.svelte';
 
   interface EmailContent {
     id: string;
@@ -11,21 +14,29 @@
     body_text: string;
     body_html?: string;
     snippet: string;
+    is_read?: boolean;
   }
 
   // Props
   interface Props {
     email: EmailContent;
     sanitizeEmailHtml: (html: string) => string;
+    autoMarkReadDelay?: number;
+    onReply?: (replyBody: string) => Promise<void>;
   }
 
   let { 
     email, 
-    sanitizeEmailHtml 
+    sanitizeEmailHtml,
+    autoMarkReadDelay = 1500,
+    onReply
   }: Props = $props();
 
   let emailIframe: HTMLIFrameElement;
   let iframeLoaded = false;
+  let readMarkingTimer: number | null = null;
+  let hasBeenMarkedRead = false;
+  let showReplyComposer = $state(false);
 
   // Helper function to format date to local time
   function formatDate(dateString: string | null | undefined): string {
@@ -107,9 +118,60 @@
 </html>`;
   }
 
+  // Auto-mark email as read after delay
+  function startReadMarkingTimer() {
+    // Only start timer if email is unread, auto-mark is enabled, and hasn't been marked already
+    if (email.is_read || hasBeenMarkedRead || readMarkingTimer || autoMarkReadDelay <= 0) {
+      return;
+    }
+
+    readMarkingTimer = window.setTimeout(async () => {
+      try {
+        if (!email.is_read && !hasBeenMarkedRead) {
+          await emailOperations.markAsRead(email.id, true); // true = automatic
+          hasBeenMarkedRead = true;
+          console.log(`📧 Auto-marked email "${email.subject}" as read after ${autoMarkReadDelay}ms`);
+        }
+      } catch (error) {
+        console.error('Error auto-marking email as read:', error);
+      } finally {
+        readMarkingTimer = null;
+      }
+    }, autoMarkReadDelay);
+  }
+
+  function clearReadMarkingTimer() {
+    if (readMarkingTimer) {
+      window.clearTimeout(readMarkingTimer);
+      readMarkingTimer = null;
+    }
+  }
+
+  // Reply handling functions
+  function handleReplyClick() {
+    showReplyComposer = true;
+  }
+
+  function handleCancelReply() {
+    showReplyComposer = false;
+  }
+
+  async function handleSendReply(replyBody: string) {
+    if (onReply) {
+      await onReply(replyBody);
+      showReplyComposer = false;
+    }
+  }
+
   // Setup iframe content when component mounts or email changes
   onMount(() => {
     setupIframeContent();
+    startReadMarkingTimer();
+  });
+
+  // Cleanup timer on destroy
+  onDestroy(() => {
+    clearReadMarkingTimer();
   });
 
   function setupIframeContent() {
@@ -195,6 +257,11 @@
   $effect(() => {
     if (email && emailIframe) {
       setupIframeContent();
+      
+      // Reset timer state for new email
+      clearReadMarkingTimer();
+      hasBeenMarkedRead = false;
+      startReadMarkingTimer();
     }
   });
 
@@ -210,13 +277,31 @@
 <div in:fade={{ duration: 300 }} class="w-full">
   <div class="overflow-hidden shadow-lg w-full bg-white rounded-lg border border-gray-200">
     <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-200 p-8">
-      <h2 class="text-2xl font-semibold text-gray-800 mb-4 leading-tight">
-        {email.subject}
-      </h2>
-      <div class="space-y-2">
-        <p class="font-medium text-gray-700 m-0">From: {email.sender}</p>
-        {#if email.date}
-          <p class="text-sm text-gray-600 m-0">Date: {formatDate(email.date)}</p>
+      <div class="flex items-start justify-between">
+        <div class="flex-1">
+          <h2 class="text-2xl font-semibold text-gray-800 mb-4 leading-tight">
+            {email.subject}
+          </h2>
+          <div class="space-y-2">
+            <p class="font-medium text-gray-700 m-0">From: {email.sender}</p>
+            {#if email.date}
+              <p class="text-sm text-gray-600 m-0">Date: {formatDate(email.date)}</p>
+            {/if}
+          </div>
+        </div>
+        
+        <!-- Reply Button -->
+        {#if onReply}
+          <Button
+            size="sm"
+            color="blue"
+            class="flex items-center gap-2 ml-4"
+            onclick={handleReplyClick}
+            title="Reply to this email"
+          >
+            <Reply class="w-4 h-4" />
+            Reply
+          </Button>
         {/if}
       </div>
     </div>
@@ -233,4 +318,12 @@
       ></iframe>
     </div>
   </div>
+  
+  <!-- Simple Bottom Composer -->
+  <EmailComposer
+    originalEmail={email}
+    onSend={handleSendReply}
+    onCancel={handleCancelReply}
+    isVisible={showReplyComposer}
+  />
 </div>

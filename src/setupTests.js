@@ -83,6 +83,26 @@ global.console = {
 // Svelte 5 specific setup for testing
 import { beforeEach } from 'vitest';
 
+// Mock browser environment
+global.window = window;
+global.document = document;
+
+// Force browser environment for Svelte
+process.env.NODE_ENV = 'test';
+process.env.VITEST = 'true';
+global.process = { 
+  ...global.process, 
+  env: { 
+    ...global.process.env, 
+    NODE_ENV: 'test',
+    VITEST: 'true'
+  },
+  browser: true
+};
+
+// Force module resolution conditions
+global.BROWSER = true;
+
 beforeEach(() => {
   // Reset DOM before each test
   document.body.innerHTML = '';

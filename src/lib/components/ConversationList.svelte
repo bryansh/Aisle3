@@ -37,20 +37,20 @@
 <div class="space-y-2">
   {#each conversations as conversation (conversation.thread_id)}
     <button 
-      class="w-full bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer text-left"
+      class="w-full rounded-lg border p-4 hover:shadow-md transition-all duration-200 cursor-pointer text-left {conversation.has_unread ? 'bg-white border-blue-200 shadow-md border-l-4 border-l-blue-500' : 'bg-gray-50 border-gray-300 hover:bg-gray-100'}"
       onclick={() => handleConversationClick(conversation)}
     >
       <div class="flex justify-between items-start mb-2">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1">
-            <h3 class="text-sm font-medium text-gray-900 truncate">
+            <h3 class="text-sm truncate {conversation.has_unread ? 'font-bold text-gray-900' : 'font-medium text-gray-600'}">
               {conversation.subject}
             </h3>
             {#if conversation.has_unread}
               <div class="w-2 h-2 bg-blue-500 rounded-full"></div>
             {/if}
           </div>
-          <p class="text-xs text-gray-600 truncate">
+          <p class="text-xs truncate {conversation.has_unread ? 'text-gray-700 font-medium' : 'text-gray-600 font-normal'}">
             {conversation.sender}
           </p>
         </div>
@@ -61,7 +61,7 @@
         </div>
       </div>
       
-      <p class="text-sm text-gray-600 line-clamp-2">
+      <p class="text-sm line-clamp-2 {conversation.has_unread ? 'text-gray-700 font-medium' : 'text-gray-600 font-normal'}">
         {decode(conversation.snippet)}
       </p>
       

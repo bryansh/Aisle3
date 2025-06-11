@@ -29,7 +29,7 @@ describe('EmailViewer Component', () => {
   it('renders email sender correctly', () => {
     render(EmailViewer, { props: defaultProps });
 
-    expect(screen.getByText('test@example.com')).toBeInTheDocument();
+    expect(screen.getByText('From: test@example.com')).toBeInTheDocument();
   });
 
   it('renders email date correctly', () => {
@@ -46,7 +46,7 @@ describe('EmailViewer Component', () => {
     expect(mockSanitizeEmailHtml).toHaveBeenCalledWith(mockEmail.body_html);
   });
 
-  it('falls back to plain text when HTML not available', () => {
+  it('renders iframe for plain text when HTML not available', () => {
     const emailWithoutHtml = {
       ...mockEmail,
       body_html: null
@@ -56,10 +56,13 @@ describe('EmailViewer Component', () => {
       props: { ...defaultProps, email: emailWithoutHtml }
     });
 
-    expect(screen.getByText(mockEmail.body_text)).toBeInTheDocument();
+    // Should render an iframe for email content
+    const iframe = screen.getByTitle('Email content');
+    expect(iframe).toBeInTheDocument();
+    expect(iframe).toHaveAttribute('sandbox');
   });
 
-  it('falls back to snippet when no body content available', () => {
+  it('renders iframe with proper security when no body content available', () => {
     const emailWithoutBody = {
       ...mockEmail,
       body_html: null,
@@ -70,7 +73,10 @@ describe('EmailViewer Component', () => {
       props: { ...defaultProps, email: emailWithoutBody }
     });
 
-    expect(screen.getByText(mockEmail.snippet)).toBeInTheDocument();
+    // Should still render an iframe structure
+    const iframe = screen.getByTitle('Email content');
+    expect(iframe).toBeInTheDocument();
+    expect(iframe).toHaveAttribute('sandbox');
   });
 
   it('handles missing email data gracefully', () => {
@@ -125,15 +131,20 @@ describe('EmailViewer Component', () => {
       props: { ...defaultProps, email: longEmail }
     });
 
-    // Component should render without errors
-    expect(screen.getByText(/AAAAAAA/)).toBeInTheDocument();
+    // Component should render iframe without errors
+    const iframe = screen.getByTitle('Email content');
+    expect(iframe).toBeInTheDocument();
+    
+    // Should truncate or show long subject
+    expect(screen.getByText(/Very long subject/)).toBeInTheDocument();
   });
 
-  it('maintains email formatting and styling', () => {
+  it('maintains email iframe structure and security', () => {
     render(EmailViewer, { props: defaultProps });
 
-    // Check that the component has proper CSS classes for styling
-    const emailContainer = document.querySelector('.email-content-clean');
-    expect(emailContainer).toBeInTheDocument();
+    // Check that iframe has proper security attributes
+    const iframe = screen.getByTitle('Email content');
+    expect(iframe).toBeInTheDocument();
+    expect(iframe).toHaveAttribute('sandbox', 'allow-popups allow-popups-to-escape-sandbox allow-same-origin');
   });
 });

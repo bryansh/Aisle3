@@ -139,8 +139,9 @@ describe('EmailList Component', () => {
   it('applies correct styling for unread emails', () => {
     render(EmailList, { props: defaultProps });
 
-    const unreadEmail = screen.getByText('Test Email 1').closest('div');
-    const readEmail = screen.getByText('Test Email 2').closest('div');
+    // Get the main email container divs (not the inner text divs)
+    const unreadEmail = screen.getByText('Test Email 1').closest('[class*="border-l-4"]');
+    const readEmail = screen.getByText('Test Email 2').closest('.bg-gray-50');
 
     // Unread emails should have special styling
     expect(unreadEmail).toHaveClass('border-l-blue-500');

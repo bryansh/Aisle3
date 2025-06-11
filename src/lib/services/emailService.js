@@ -90,8 +90,9 @@ export class EmailService {
    */
   /**
    * @param {string} emailId
+   * @param {boolean} isAutomatic - Whether this is an automatic marking
    */
-  async markAsRead(emailId) {
+  async markAsRead(emailId, isAutomatic = false) {
     try {
       await invoke('mark_email_as_read', { emailId });
       
@@ -103,9 +104,77 @@ export class EmailService {
       // Refresh stats
       await this.loadStatsInBackground();
       
+      if (isAutomatic) {
+        const email = this.findEmailById(emailId);
+        console.log(`📧 Auto-marked email "${email?.subject || emailId}" as read`);
+      }
+      
       return true;
     } catch (error) {
       console.error('Error marking email as read:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark email as read after a delay (auto-read functionality)
+   */
+  /**
+   * @param {string} emailId
+   * @param {number} delayMs - Delay in milliseconds before marking as read
+   * @returns {number | null} Timer ID that can be used to cancel the operation
+   */
+  scheduleAutoMarkAsRead(emailId, delayMs = 1500) {
+    const email = this.findEmailById(emailId);
+    
+    // Don't schedule if already read
+    if (!email || email.is_read) {
+      return null;
+    }
+
+    return window.setTimeout(async () => {
+      try {
+        // Double-check email is still unread
+        const currentEmail = this.findEmailById(emailId);
+        if (currentEmail && !currentEmail.is_read) {
+          await this.markAsRead(emailId, true);
+        }
+      } catch (error) {
+        console.error('Error in scheduled mark as read:', error);
+      }
+    }, delayMs);
+  }
+
+  /**
+   * Cancel a scheduled auto-mark operation
+   */
+  /**
+   * @param {number | null} timerId
+   */
+  cancelAutoMarkAsRead(timerId) {
+    if (timerId) {
+      window.clearTimeout(timerId);
+    }
+  }
+
+  /**
+   * Send a reply to an email
+   */
+  /**
+   * @param {string} originalEmailId
+   * @param {string} replyBody
+   */
+  async sendReply(originalEmailId, replyBody) {
+    try {
+      const result = await invoke('send_reply', { 
+        originalEmailId, 
+        replyBody 
+      });
+      
+      console.log('📧 Reply sent successfully:', result);
+      return result;
+    } catch (error) {
+      console.error('Error sending reply:', error);
       throw error;
     }
   }

@@ -114,17 +114,20 @@ export const emailOperations = {
 
   /**
    * @param {string} emailId
+   * @param {boolean} isAutomatic - Whether this is an automatic marking
    */
-  async markAsRead(emailId) {
-    // Add to loading set
-    loadingEmailStates.update(set => {
-      const newSet = new Set(set);
-      newSet.add(emailId);
-      return newSet;
-    });
+  async markAsRead(emailId, isAutomatic = false) {
+    // Don't show loading spinner for automatic marking
+    if (!isAutomatic) {
+      loadingEmailStates.update(set => {
+        const newSet = new Set(set);
+        newSet.add(emailId);
+        return newSet;
+      });
+    }
 
     try {
-      await emailService.markAsRead(emailId);
+      await emailService.markAsRead(emailId, isAutomatic);
       
       // Update emails store
       emails.update(/** @param {any[]} emailList */ emailList => 
@@ -139,12 +142,50 @@ export const emailOperations = {
       console.error('Error marking email as read:', error);
       throw error;
     } finally {
-      // Remove from loading set
-      loadingEmailStates.update(set => {
-        const newSet = new Set(set);
-        newSet.delete(emailId);
-        return newSet;
-      });
+      // Remove from loading set (only if we added it)
+      if (!isAutomatic) {
+        loadingEmailStates.update(set => {
+          const newSet = new Set(set);
+          newSet.delete(emailId);
+          return newSet;
+        });
+      }
+    }
+  },
+
+  /**
+   * Schedule automatic read marking for an email
+   * @param {string} emailId
+   * @param {number} delayMs
+   */
+  scheduleAutoMarkAsRead(emailId, delayMs = 1500) {
+    return emailService.scheduleAutoMarkAsRead(emailId, delayMs);
+  },
+
+  /**
+   * Cancel automatic read marking
+   * @param {number} timerId
+   */
+  cancelAutoMarkAsRead(timerId) {
+    emailService.cancelAutoMarkAsRead(timerId);
+  },
+
+  /**
+   * Send a reply to an email
+   * @param {string} originalEmailId
+   * @param {string} replyBody
+   */
+  async sendReply(originalEmailId, replyBody) {
+    try {
+      const result = await emailService.sendReply(originalEmailId, replyBody);
+      
+      // Optionally refresh emails to show the sent reply
+      // await this.loadEmailsInBackground();
+      
+      return result;
+    } catch (error) {
+      console.error('Error sending reply:', error);
+      throw error;
     }
   },
 
