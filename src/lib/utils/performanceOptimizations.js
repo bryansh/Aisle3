@@ -37,8 +37,7 @@ export function throttle(func, limit) {
   
   return function throttledFunction(/** @type {any[]} */ ...args) {
     if (!inThrottle) {
-      // @ts-ignore - Preserving 'this' context for wrapped function
-      func.apply(this, args);
+      func(...args);
       inThrottle = true;
       setTimeout(() => (inThrottle = false), limit);
     }
@@ -61,8 +60,7 @@ export function memoize(fn, keyGenerator = JSON.stringify) {
       return cache.get(key);
     }
     
-    // @ts-ignore - Preserving 'this' context for wrapped function
-    const result = fn.apply(this, args);
+    const result = fn(...args);
     cache.set(key, result);
     
     // Limit cache size to prevent memory leaks
@@ -395,10 +393,8 @@ export class SvelteOptimizer {
     return function batchedFunction(/** @type {any[]} */ ...args) {
       if (!pendingUpdate) {
         pendingUpdate = true;
-        // @ts-ignore - Capturing 'this' context for async execution
-        const context = this;
         requestAnimationFrame(() => {
-          updateFn.apply(context, args);
+          updateFn(...args);
           pendingUpdate = false;
         });
       }
