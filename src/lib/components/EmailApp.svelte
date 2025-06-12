@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { invoke } from '@tauri-apps/api/core';
   import AuthSection from './AuthSection.svelte';
   import Header from './Header.svelte';
   import EmailList from './EmailList.svelte';
@@ -14,6 +13,11 @@
   import { decode } from 'he';
   import { performanceSuite } from '../utils/performance.js';
   import { debounce, globalOptimizer } from '../utils/performanceOptimizations.js';
+  
+  // Import utility modules
+  import { SettingsManager } from '../utils/settingsManager.js';
+  import { AuthManager, initializeAuth, handleAuthSuccess as handleAuthSuccessUtil } from '../utils/authManager.js';
+  import { createEmailPollingManager } from '../utils/pollingManager.js';
 
   // Import stores
   import {
@@ -35,49 +39,37 @@
     navigationOperations
   } from '../stores/emailStore.js';
 
+  // Initialize utility managers
+  const settingsManager = new SettingsManager();
+  let authManager: AuthManager;
+  let pollingManager: any;
+  
   // Authentication state
   let isAuthenticated = $state(false);
+  
+  // Settings state (bound to settingsManager)
+  let autoPollingEnabled = $state(settingsManager.getSetting('autoPollingEnabled'));
+  let pollingIntervalSeconds = $state(settingsManager.getSetting('pollingIntervalSeconds'));
+  let autoMarkReadEnabled = $state(settingsManager.getSetting('autoMarkReadEnabled'));
+  let autoMarkReadDelay = $state(settingsManager.getSetting('autoMarkReadDelay'));
 
-  // Auto-polling state
-  let autoPollingEnabled = $state(false);
-  let pollingIntervalSeconds = $state(30);
-  let pollingInterval: number | null = $state(null);
-
-  // Auto-mark read state
-  let autoMarkReadEnabled = $state(true);
-  let autoMarkReadDelay = $state(1500);
-
-  // Load settings from localStorage
+  // Load settings from settingsManager
   const loadSettings = () => {
-    if (typeof window !== 'undefined') {
-      const savedAutoPolling = localStorage.getItem('autoPollingEnabled');
-      const savedInterval = localStorage.getItem('pollingIntervalSeconds');
-      const savedAutoMarkRead = localStorage.getItem('autoMarkReadEnabled');
-      const savedAutoMarkReadDelay = localStorage.getItem('autoMarkReadDelay');
-      
-      if (savedAutoPolling !== null) {
-        autoPollingEnabled = JSON.parse(savedAutoPolling);
-      }
-      if (savedInterval !== null) {
-        pollingIntervalSeconds = parseInt(savedInterval, 10);
-      }
-      if (savedAutoMarkRead !== null) {
-        autoMarkReadEnabled = JSON.parse(savedAutoMarkRead);
-      }
-      if (savedAutoMarkReadDelay !== null) {
-        autoMarkReadDelay = parseInt(savedAutoMarkReadDelay, 10);
-      }
-    }
+    const settings = settingsManager.getSettings();
+    autoPollingEnabled = settings.autoPollingEnabled;
+    pollingIntervalSeconds = settings.pollingIntervalSeconds;
+    autoMarkReadEnabled = settings.autoMarkReadEnabled;
+    autoMarkReadDelay = settings.autoMarkReadDelay;
   };
 
-  // Save settings to localStorage
+  // Save settings via settingsManager
   const saveSettings = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('autoPollingEnabled', JSON.stringify(autoPollingEnabled));
-      localStorage.setItem('pollingIntervalSeconds', pollingIntervalSeconds.toString());
-      localStorage.setItem('autoMarkReadEnabled', JSON.stringify(autoMarkReadEnabled));
-      localStorage.setItem('autoMarkReadDelay', autoMarkReadDelay.toString());
-    }
+    settingsManager.updateSettings({
+      autoPollingEnabled,
+      pollingIntervalSeconds,
+      autoMarkReadEnabled,
+      autoMarkReadDelay
+    });
   };
 
   // Check authentication status on mount
@@ -88,19 +80,34 @@
     
     const initializeApp = async () => {
       try {
+        // Load settings from settingsManager
         loadSettings();
         
-        isAuthenticated = await invoke<boolean>('get_auth_status');
-        if (isAuthenticated) {
-          await emailOperations.loadEmails();
-          await emailOperations.loadStats();
+        // Initialize authentication
+        const authResult = await initializeAuth(emailOperations);
+        if (authResult.success) {
+          authManager = authResult.data.authManager;
+          isAuthenticated = authResult.data.isAuthenticated;
           
-          if (autoPollingEnabled) {
-            startAutoPolling();
+          // Set up auth state listener
+          authManager.addListener((authState) => {
+            isAuthenticated = authState.isAuthenticated;
+          });
+          
+          // Initialize polling manager if authenticated
+          if (isAuthenticated) {
+            pollingManager = createEmailPollingManager(emailOperations, {
+              intervalSeconds: pollingIntervalSeconds,
+              enabled: autoPollingEnabled
+            });
+            
+            if (autoPollingEnabled) {
+              pollingManager.start();
+            }
           }
         }
       } catch (error) {
-        console.error('Error checking auth status:', error);
+        console.error('Error initializing app:', error);
       }
     };
 
@@ -117,8 +124,13 @@
     
     return () => {
       document.removeEventListener('keydown', handleKeydown);
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
+      
+      // Cleanup utility managers
+      if (pollingManager) {
+        pollingManager.cleanup();
+      }
+      if (authManager) {
+        authManager.cleanup();
       }
       
       // Cleanup performance monitoring
@@ -129,9 +141,20 @@
 
   // Authentication handler
   const handleAuthSuccess = async () => {
-    isAuthenticated = true;
-    await emailOperations.loadEmails();
-    await emailOperations.loadStats();
+    if (authManager) {
+      const result = await handleAuthSuccessUtil(authManager, emailOperations);
+      if (result.success) {
+        // Initialize polling manager for authenticated user
+        pollingManager = createEmailPollingManager(emailOperations, {
+          intervalSeconds: pollingIntervalSeconds,
+          enabled: autoPollingEnabled
+        });
+        
+        if (autoPollingEnabled) {
+          pollingManager.start();
+        }
+      }
+    }
   };
 
   // Email selection handlers
@@ -147,25 +170,17 @@
     navigationOperations.selectConversation(conversation);
   };
 
-  // Auto-polling functions
+  // Auto-polling functions (delegated to pollingManager)
   const startAutoPolling = () => {
-    if (pollingInterval) return;
-    
-    pollingInterval = setInterval(async () => {
-      if (isAuthenticated) {
-        await emailOperations.checkForNewEmails(true);
-      }
-    }, pollingIntervalSeconds * 1000);
-    
-    console.log(`🔄 Auto-polling started (every ${pollingIntervalSeconds} seconds)`);
+    if (pollingManager) {
+      pollingManager.start();
+    }
   };
 
   const stopAutoPolling = () => {
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
-      pollingInterval = null;
+    if (pollingManager) {
+      pollingManager.stop();
     }
-    console.log('⏹️ Auto-polling stopped');
   };
 
   // Settings event handlers
@@ -181,15 +196,18 @@
   const handleIntervalChanged = () => {
     console.log(`🔄 Polling interval changed to ${pollingIntervalSeconds} seconds`);
     
-    if (autoPollingEnabled && pollingInterval) {
-      stopAutoPolling();
-      startAutoPolling();
+    if (pollingManager) {
+      pollingManager.setInterval(pollingIntervalSeconds);
     }
     saveSettings();
   };
 
   const handleCheckNow = async () => {
-    await emailOperations.checkForNewEmails(false);
+    if (pollingManager) {
+      await pollingManager.poll();
+    } else {
+      await emailOperations.checkForNewEmails(false);
+    }
   };
 
   // Reply handling
