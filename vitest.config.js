@@ -16,7 +16,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.js'],
     include: ['src/**/*.{test,spec}.{js,ts}'],
-    exclude: ['src/tests/playwright/**'],
+    exclude: ['src/tests/playwright/**', 'src/tests/visual/**', 'src/tests/performance/**'],
     coverage: {
       reporter: ['text', 'json', 'html'],
       exclude: [

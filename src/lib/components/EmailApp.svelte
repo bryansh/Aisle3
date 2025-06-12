@@ -4,6 +4,7 @@
   import AuthSection from './AuthSection.svelte';
   import Header from './Header.svelte';
   import EmailList from './EmailList.svelte';
+  import EmailListVirtualized from './EmailListVirtualized.svelte';
   import EmailViewer from './EmailViewer.svelte';
   import LoadingSpinner from './LoadingSpinner.svelte';
   import Settings from './Settings.svelte';
@@ -11,6 +12,8 @@
   import ConversationViewer from './ConversationViewer.svelte';
   import DOMPurify from 'dompurify';
   import { decode } from 'he';
+  import { performanceSuite } from '../utils/performance.js';
+  import { debounce, globalOptimizer } from '../utils/performanceOptimizations.js';
 
   // Import stores
   import {
@@ -79,6 +82,10 @@
 
   // Check authentication status on mount
   onMount(() => {
+    // Initialize performance monitoring
+    globalOptimizer.init();
+    performanceSuite.startMonitoring();
+    
     const initializeApp = async () => {
       try {
         loadSettings();
@@ -113,6 +120,10 @@
       if (pollingInterval) {
         clearInterval(pollingInterval);
       }
+      
+      // Cleanup performance monitoring
+      performanceSuite.stopMonitoring();
+      globalOptimizer.cleanup();
     };
   });
 
@@ -311,12 +322,16 @@
             onConversationSelect={handleConversationSelect}
           />
         {:else}
-          <EmailList 
+          <EmailListVirtualized 
             emails={$emails}
             onEmailSelect={handleEmailSelect}
             onMarkAsRead={emailOperations.markAsRead}
             onMarkAsUnread={emailOperations.markAsUnread}
             loadingEmailStates={loadingEmailStates}
+            containerHeight={600}
+            itemHeight={120}
+            useVirtualization={true}
+            virtualizationThreshold={50}
           />
         {/if}
       {/if}
