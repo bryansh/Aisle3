@@ -60,6 +60,13 @@ impl RateLimiter {
         let mut limits = self.limits.lock().unwrap();
         limits.clear();
     }
+
+    /// Reset rate limit for a specific operation (useful for testing)
+    #[cfg(test)]
+    pub fn reset_operation(&self, operation: &str) {
+        let mut limits = self.limits.lock().unwrap();
+        limits.remove(operation);
+    }
 }
 
 impl RateLimit {
