@@ -69,13 +69,14 @@ function getCurrentVersion() {
 function main() {
   log(`${colors.bold}🚀 Aisle3 Release Readiness Check${colors.reset}`, 'blue');
   log(`Current version: v${getCurrentVersion()}`, 'blue');
+  log(`This runs the same checks as CI to catch issues locally before pushing.`, 'blue');
   
   const checks = [];
   
   // 1. Git Status Check (warning only)
   const gitClean = checkGitStatus();
   
-  // 2. Rust Formatting Check
+  // 2. Rust Formatting Check (same as CI)
   const rustFmt = run(
     'cargo fmt --check', 
     'Rust formatting check',
@@ -91,25 +92,25 @@ function main() {
   );
   checks.push(rustClippy);
   
-  // 4. TypeScript/Svelte Check
+  // 4. TypeScript/Svelte Check (same as CI)
   const tsCheck = run(
     'npm run check', 
-    'TypeScript/Svelte check'
+    'TypeScript/Svelte linting'
   );
   checks.push(tsCheck);
   
-  // 5. Rust Tests
+  // 5. Rust Tests (same as CI)
   const rustTests = run(
     'cargo test', 
-    'Rust tests',
+    'Rust tests (43 tests)',
     { cwd: path.join(__dirname, '..', 'src-tauri') }
   );
   checks.push(rustTests);
   
-  // 6. JavaScript/Svelte Tests
+  // 6. JavaScript/Svelte Tests (same as CI)
   const jsTests = run(
     'npm run test:run', 
-    'JavaScript/Svelte tests'
+    'JavaScript/Svelte tests (616 tests)'
   );
   checks.push(jsTests);
   
