@@ -1,2 +1,45 @@
 @import "tailwindcss";
 @import 'flowbite/dist/flowbite.css';
+
+/* Cursor pointer for interactive elements */
+button,
+.btn,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+input[type="checkbox"],
+input[type="radio"],
+select,
+[onclick],
+[tabindex="0"],
+.clickable,
+.interactive {
+  cursor: pointer;
+}
+
+/* Specific element targeting */
+.email-item:hover,
+.conversation-item:hover,
+.settings-option:hover,
+.nav-item:hover {
+  cursor: pointer;
+}
+
+/* Disabled state should show not-allowed cursor */
+button:disabled,
+input:disabled,
+select:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+/* Text inputs should show text cursor */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input[type="url"],
+textarea {
+  cursor: text;
+}

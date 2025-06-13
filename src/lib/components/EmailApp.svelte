@@ -46,6 +46,7 @@
   
   // Authentication state
   let isAuthenticated = $state(false);
+  let isDemoMode = $state(false);
   
   // Settings state (bound to settingsManager)
   let autoPollingEnabled = $state(settingsManager.getSetting('autoPollingEnabled'));
@@ -115,8 +116,14 @@
 
     // Add ESC key event listener
     const handleKeydown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && $showEmailView) {
-        navigationOperations.backToInbox();
+      if (event.key === 'Escape') {
+        if (showDemoMessage) {
+          showDemoMessage = false;
+        } else if ($showEmailView) {
+          navigationOperations.backToInbox();
+        } else if ($showSettings) {
+          navigationOperations.backToInbox();
+        }
       }
     };
 
@@ -157,8 +164,30 @@
     }
   };
 
+  // Demo mode handler
+  const handleTryDemo = async () => {
+    isDemoMode = true;
+    isAuthenticated = true; // Treat demo as authenticated to show main UI
+    
+    // Load mock emails immediately
+    try {
+      await emailOperations.loadEmails();
+    } catch (error) {
+      console.error('Error loading demo emails:', error);
+    }
+  };
+
+  // Demo message state
+  let showDemoMessage = $state(false);
+
   // Email selection handlers
   const handleEmailSelect = async (email: any) => {
+    if (isDemoMode) {
+      // In demo mode, show a message encouraging login instead of trying to fetch content
+      showDemoMessage = true;
+      return;
+    }
+    
     try {
       await emailOperations.getEmailContent(email.id);
     } catch (error) {
@@ -168,6 +197,24 @@
 
   const handleConversationSelect = (conversation: any) => {
     navigationOperations.selectConversation(conversation);
+  };
+
+  // Demo-aware mark as read handler
+  const handleMarkAsRead = async (emailId: string, isAutomatic = false) => {
+    if (isDemoMode) {
+      showDemoMessage = true;
+      return;
+    }
+    return emailOperations.markAsRead(emailId, isAutomatic);
+  };
+
+  // Demo-aware mark as unread handler
+  const handleMarkAsUnread = async (emailId: string) => {
+    if (isDemoMode) {
+      showDemoMessage = true;
+      return;
+    }
+    return emailOperations.markAsUnread(emailId);
   };
 
   // Auto-polling functions (delegated to pollingManager)
@@ -263,6 +310,24 @@
 <main class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
   <div class="max-w-7xl mx-auto">
     {#if isAuthenticated}
+      {#if isDemoMode}
+        <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center">
+              <div class="w-2 h-2 bg-amber-400 rounded-full mr-2"></div>
+              <span class="text-sm font-medium text-amber-800">Demo Mode</span>
+              <span class="text-xs text-amber-600 ml-2">Showing sample emails</span>
+            </div>
+            <button 
+              onclick={() => { isDemoMode = false; isAuthenticated = false; }}
+              class="text-amber-600 hover:text-amber-800 text-sm font-medium"
+            >
+              Exit Demo
+            </button>
+          </div>
+        </div>
+      {/if}
+      
       <Header 
         showEmailView={$showEmailView}
         showSettings={$showSettings}
@@ -282,8 +347,8 @@
           <ConversationViewer 
             conversation={$selectedConversation}
             onEmailSelect={handleEmailSelect}
-            onMarkAsRead={emailOperations.markAsRead}
-            onMarkAsUnread={emailOperations.markAsUnread}
+            onMarkAsRead={handleMarkAsRead}
+            onMarkAsUnread={handleMarkAsUnread}
             loadingEmailStates={loadingEmailStates}
             {decode}
           />
@@ -343,8 +408,8 @@
           <EmailListVirtualized 
             emails={$emails}
             onEmailSelect={handleEmailSelect}
-            onMarkAsRead={emailOperations.markAsRead}
-            onMarkAsUnread={emailOperations.markAsUnread}
+            onMarkAsRead={handleMarkAsRead}
+            onMarkAsUnread={handleMarkAsUnread}
             loadingEmailStates={loadingEmailStates}
             containerHeight={600}
             itemHeight={120}
@@ -354,9 +419,53 @@
         {/if}
       {/if}
     {:else}
-      <AuthSection onAuthSuccess={handleAuthSuccess} />
+      <AuthSection onAuthSuccess={handleAuthSuccess} onTryDemo={handleTryDemo} />
     {/if}
   </div>
+
+  <!-- Demo Message Modal -->
+  {#if showDemoMessage}
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div 
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" 
+      onclick={() => showDemoMessage = false}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="demo-modal-title"
+      tabindex="-1"
+    >
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md mx-4" onclick={(e) => e.stopPropagation()}>
+        <div class="text-center">
+          <div class="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
+            <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+          </div>
+          <h3 id="demo-modal-title" class="text-lg font-semibold text-gray-900 mb-2">Connect Gmail for Full Access</h3>
+          <p class="text-gray-600 mb-6">
+            To read email content and access all features, please connect your Gmail account.
+          </p>
+          <div class="space-y-3">
+            <button 
+              onclick={() => { showDemoMessage = false; isDemoMode = false; isAuthenticated = false; }}
+              class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+            >
+              Connect Gmail Account
+            </button>
+            <button 
+              onclick={() => showDemoMessage = false}
+              class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors"
+            >
+              Continue Demo
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
 </main>
 
 <style>

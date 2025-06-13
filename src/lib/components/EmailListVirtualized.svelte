@@ -53,10 +53,14 @@
   const handleToggleReadStatus = async (event: Event, email: Email) => {
     event.stopPropagation();
     
-    if (email.is_read) {
-      await onMarkAsUnread(email.id);
-    } else {
-      await onMarkAsRead(email.id);
+    try {
+      if (email.is_read) {
+        await onMarkAsUnread(email.id);
+      } else {
+        await onMarkAsRead(email.id);
+      }
+    } catch (error) {
+      console.error('Error toggling read status:', error);
     }
   };
 

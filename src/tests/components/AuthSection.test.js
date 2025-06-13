@@ -11,23 +11,27 @@ import { invoke } from '@tauri-apps/api/core';
 
 describe('AuthSection Component', () => {
   const mockOnAuthSuccess = vi.fn();
+  const mockOnTryDemo = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockOnAuthSuccess.mockClear();
+    mockOnTryDemo.mockClear();
   });
 
   describe('Initial Rendering', () => {
     it('renders the initial authentication state', () => {
       render(AuthSection, {
         props: {
-          onAuthSuccess: mockOnAuthSuccess
+          onAuthSuccess: mockOnAuthSuccess,
+          onTryDemo: mockOnTryDemo
         }
       });
 
-      expect(screen.getByRole('heading', { name: 'Connect Gmail' })).toBeInTheDocument();
-      expect(screen.getByText('Connect your Gmail account to start managing your emails')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Aisle 3' })).toBeInTheDocument();
+      expect(screen.getByText('Connect your Gmail account for full functionality, or try the demo to explore the interface.')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Connect Gmail Account' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Try Demo Mode' })).toBeInTheDocument();
       
       // Should not show callback URL input initially
       expect(screen.queryByPlaceholderText('Paste callback URL here...')).not.toBeInTheDocument();
@@ -37,7 +41,8 @@ describe('AuthSection Component', () => {
     it('has proper visual elements', () => {
       render(AuthSection, {
         props: {
-          onAuthSuccess: mockOnAuthSuccess
+          onAuthSuccess: mockOnAuthSuccess,
+          onTryDemo: mockOnTryDemo
         }
       });
 
@@ -46,7 +51,7 @@ describe('AuthSection Component', () => {
       expect(mailIcon).toBeInTheDocument();
       
       // Check for card structure
-      const card = document.querySelector('.max-w-2xl');
+      const card = document.querySelector('.max-w-md');
       expect(card).toBeInTheDocument();
     });
   });
@@ -66,7 +71,8 @@ describe('AuthSection Component', () => {
 
       render(AuthSection, {
         props: {
-          onAuthSuccess: mockOnAuthSuccess
+          onAuthSuccess: mockOnAuthSuccess,
+          onTryDemo: mockOnTryDemo
         }
       });
 
@@ -82,7 +88,7 @@ describe('AuthSection Component', () => {
       await waitFor(() => {
         expect(screen.getByPlaceholderText('Paste callback URL here...')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Complete Authentication' })).toBeInTheDocument();
-        expect(screen.getByText('Complete authentication in your browser, then paste the callback URL here:')).toBeInTheDocument();
+        expect(screen.getByText('Complete authentication in your browser, then paste the callback URL below:')).toBeInTheDocument();
       });
 
       // Should not show the Connect Gmail Account button anymore
@@ -102,7 +108,8 @@ describe('AuthSection Component', () => {
 
       render(AuthSection, {
         props: {
-          onAuthSuccess: mockOnAuthSuccess
+          onAuthSuccess: mockOnAuthSuccess,
+          onTryDemo: mockOnTryDemo
         }
       });
 
@@ -377,7 +384,7 @@ describe('AuthSection Component', () => {
         expect(infoMessage).toBeInTheDocument();
         
         // Info messages should be in blue alert style
-        const messageContainer = infoMessage.closest('.max-w-2xl'); // Should find the card container
+        const messageContainer = infoMessage.closest('.max-w-md'); // Should find the card container
         expect(messageContainer).toBeInTheDocument();
       });
     });
@@ -475,7 +482,7 @@ describe('AuthSection Component', () => {
         }
       });
 
-      expect(screen.getByRole('heading', { name: 'Connect Gmail' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Aisle 3' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Connect Gmail Account' })).toBeInTheDocument();
     });
 
@@ -587,6 +594,22 @@ describe('AuthSection Component', () => {
         expect(invoke).toHaveBeenCalledWith('complete_gmail_auth', { callbackUrl: '   ' });
         expect(screen.getByText(`Authentication error: Error: ${mockError}`)).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('Demo Mode', () => {
+    it('calls onTryDemo callback when Try Demo Mode button is clicked', async () => {
+      render(AuthSection, {
+        props: {
+          onAuthSuccess: mockOnAuthSuccess,
+          onTryDemo: mockOnTryDemo
+        }
+      });
+
+      const demoButton = screen.getByRole('button', { name: 'Try Demo Mode' });
+      await fireEvent.click(demoButton);
+
+      expect(mockOnTryDemo).toHaveBeenCalledTimes(1);
     });
   });
 });
