@@ -23,8 +23,6 @@
     "test:rust": "cd src-tauri && cargo test",
     "test:rust:watch": "cd src-tauri && cargo watch -x test",
     "test:all": "npm run test:run && npm run test:rust",
-    "test:working": "npm run test:services && npx vitest run src/tests/stores/emailStore.simple.test.js --config vitest.config.js",
-    "test:ci": "npm run test:working && npm run test:rust",
     "test:components": "vitest run src/tests/components --config vitest.config.js",
     "test:stores": "vitest run src/tests/stores --config vitest.config.js",
     "test:services": "vitest run src/tests/services --config vitest.config.js",

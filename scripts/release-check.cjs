@@ -83,9 +83,9 @@ function main() {
   );
   checks.push(rustFmt);
   
-  // 3. Rust Clippy Check
+  // 3. Rust Clippy Check (same as CI)
   const rustClippy = run(
-    'cargo clippy -- -D warnings', 
+    'cargo clippy --all-targets --all-features -- -D warnings', 
     'Rust linting (clippy)',
     { cwd: path.join(__dirname, '..', 'src-tauri') }
   );

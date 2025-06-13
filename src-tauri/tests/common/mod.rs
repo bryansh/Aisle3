@@ -9,11 +9,5 @@ pub fn create_test_tokens() -> AuthTokens {
     }
 }
 
-/// Shared test helper to create expired auth tokens
-pub fn create_expired_tokens() -> AuthTokens {
-    AuthTokens {
-        access_token: "expired_access_token".to_string(),
-        refresh_token: Some("expired_refresh_token".to_string()),
-        expires_in: Some(0), // Already expired
-    }
-}
+// Note: create_expired_tokens() was removed as it was unused
+// Add it back if needed for future tests
