@@ -79,6 +79,8 @@
   }
 
   async function handleSend() {
+    if (isSending) return; // Prevent multiple sends
+    
     const plainText = getPlainText().trim();
     if (!plainText) return;
     

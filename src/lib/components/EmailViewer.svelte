@@ -152,6 +152,27 @@
     showReplyComposer = true;
   }
 
+  // Keyboard shortcut handler
+  function handleKeydown(event: KeyboardEvent) {
+    // Only handle if not already in composer and onReply is available
+    if (showReplyComposer || !onReply) return;
+    
+    // Check if focus is in an input/textarea to avoid interfering with typing
+    const activeElement = document.activeElement;
+    if (activeElement && (
+      activeElement.tagName === 'INPUT' ||
+      activeElement.tagName === 'TEXTAREA' ||
+      activeElement.contentEditable === 'true'
+    )) {
+      return;
+    }
+
+    if (event.key.toLowerCase() === 'r' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      handleReplyClick();
+    }
+  }
+
   function handleCancelReply() {
     showReplyComposer = false;
   }
@@ -167,11 +188,17 @@
   onMount(() => {
     setupIframeContent();
     startReadMarkingTimer();
+    
+    // Add keyboard event listener
+    document.addEventListener('keydown', handleKeydown);
   });
 
   // Cleanup timer on destroy
   onDestroy(() => {
     clearReadMarkingTimer();
+    
+    // Remove keyboard event listener
+    document.removeEventListener('keydown', handleKeydown);
   });
 
   function setupIframeContent() {
@@ -297,10 +324,11 @@
             color="blue"
             class="flex items-center gap-2 ml-4"
             onclick={handleReplyClick}
-            title="Reply to this email"
+            title="Reply to this email (Press R)"
           >
             <Reply class="w-4 h-4" />
             Reply
+            <kbd class="hidden sm:inline-block ml-1 px-1 py-0.5 text-xs font-mono bg-blue-200 text-blue-800 rounded">R</kbd>
           </Button>
         {/if}
       </div>
