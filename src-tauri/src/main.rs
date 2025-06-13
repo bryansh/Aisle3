@@ -12,7 +12,6 @@ use gmail_client::GmailClient;
 use rate_limiter::RateLimiter;
 use secure_storage::SecureStorage;
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::State;
@@ -301,7 +300,8 @@ async fn logout_gmail(state: State<'_, AppState>) -> Result<String, String> {
 #[tauri::command]
 async fn get_auth_status(state: State<'_, AppState>) -> Result<bool, String> {
     let tokens = state.auth_tokens.lock().unwrap();
-    Ok(tokens.is_some())
+    // Check both in-memory tokens and secure storage
+    Ok(tokens.is_some() || SecureStorage::has_tokens())
 }
 
 #[tauri::command]

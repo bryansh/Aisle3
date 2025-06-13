@@ -1,6 +1,5 @@
 use crate::gmail_auth::AuthTokens;
 use keyring::{Entry, Error as KeyringError};
-use serde::{Deserialize, Serialize};
 
 const SERVICE_NAME: &str = "com.aisle3.app";
 const TOKEN_KEY: &str = "gmail_tokens";
@@ -45,10 +44,11 @@ impl SecureStorage {
         let entry = Entry::new(SERVICE_NAME, TOKEN_KEY)
             .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
 
-        entry.delete_password().map_err(|e| match e {
-            KeyringError::NoEntry => return Ok(()), // Already deleted
-            _ => format!("Failed to delete tokens from keyring: {}", e),
-        })?;
+        match entry.delete_password() {
+            Ok(()) => Ok(()),
+            Err(KeyringError::NoEntry) => Ok(()), // Already deleted
+            Err(e) => Err(format!("Failed to delete tokens from keyring: {}", e)),
+        }?;
 
         Ok(())
     }

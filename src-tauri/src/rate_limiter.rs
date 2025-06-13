@@ -55,6 +55,7 @@ impl RateLimiter {
     }
 
     /// Reset rate limits for all operations (useful for testing)
+    #[cfg(test)]
     pub fn reset_all(&self) {
         let mut limits = self.limits.lock().unwrap();
         limits.clear();
