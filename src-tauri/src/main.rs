@@ -4,9 +4,13 @@
 mod gmail_auth;
 mod gmail_client;
 mod gmail_config;
+mod rate_limiter;
+mod secure_storage;
 
 use gmail_auth::{parse_callback_url, AuthTokens, GmailAuth};
 use gmail_client::GmailClient;
+use rate_limiter::RateLimiter;
+use secure_storage::SecureStorage;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -18,6 +22,7 @@ struct AppState {
     gmail_auth: Mutex<Option<GmailAuth>>,
     auth_tokens: Mutex<Option<AuthTokens>>,
     last_check_time: Mutex<Option<String>>, // Store last email check timestamp
+    rate_limiter: RateLimiter,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -82,6 +87,8 @@ async fn install_update(app: tauri::AppHandle) -> Result<String, String> {
 
 #[tauri::command]
 async fn get_emails(state: State<'_, AppState>) -> Result<Vec<Email>, String> {
+    // Check rate limit
+    state.rate_limiter.check_rate_limit("get_emails")?;
     // This will either return valid tokens or an error
     let tokens = match refresh_tokens_if_needed(&state).await {
         Ok(tokens) => tokens,
@@ -210,6 +217,8 @@ async fn get_email_content(
     email_id: String,
     state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
+    // Check rate limit
+    state.rate_limiter.check_rate_limit("get_email_content")?;
     // Check if we have auth tokens
     let tokens = {
         let tokens_guard = state.auth_tokens.lock().unwrap();
@@ -277,7 +286,10 @@ async fn complete_gmail_auth(
 async fn logout_gmail(state: State<'_, AppState>) -> Result<String, String> {
     *state.auth_tokens.lock().unwrap() = None;
 
-    // Delete saved tokens
+    // Delete saved tokens from secure storage
+    SecureStorage::delete_tokens().map_err(|e| e.to_string())?;
+
+    // Also clean up legacy file if it exists
     let token_file = get_token_file_path();
     if token_file.exists() {
         std::fs::remove_file(token_file).map_err(|e| e.to_string())?;
@@ -307,19 +319,24 @@ fn get_token_file_path() -> PathBuf {
 }
 
 fn save_tokens(tokens: &AuthTokens) -> Result<(), Box<dyn std::error::Error>> {
-    let token_file = get_token_file_path();
-    let json = serde_json::to_string(tokens)?;
-    fs::write(token_file, json)?;
-    Ok(())
+    SecureStorage::save_tokens(tokens).map_err(|e| e.into())
 }
 
 fn load_tokens() -> Option<AuthTokens> {
+    // First try to load from secure storage
+    if let Ok(tokens) = SecureStorage::load_tokens() {
+        return Some(tokens);
+    }
+
+    // If no tokens in secure storage, try to migrate from old file
     let token_file = get_token_file_path();
     if token_file.exists() {
-        if let Ok(json) = fs::read_to_string(token_file) {
-            return serde_json::from_str(&json).ok();
+        if let Ok(true) = SecureStorage::migrate_from_file(&token_file) {
+            // Migration successful, try loading again
+            return SecureStorage::load_tokens().ok();
         }
     }
+
     None
 }
 
@@ -400,6 +417,8 @@ async fn send_reply(
     reply_body: String,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
+    // Check rate limit
+    state.rate_limiter.check_rate_limit("send_reply")?;
     let tokens = match refresh_tokens_if_needed(&state).await {
         Ok(tokens) => tokens,
         Err(e) => return Err(format!("Authentication required: {}", e)),
@@ -518,6 +537,7 @@ fn main() {
             gmail_auth: Mutex::new(None),
             auth_tokens: Mutex::new(saved_tokens),
             last_check_time: Mutex::new(None),
+            rate_limiter: RateLimiter::new(),
         })
         .invoke_handler(tauri::generate_handler![
             get_emails,

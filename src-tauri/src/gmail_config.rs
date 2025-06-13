@@ -20,17 +20,46 @@ impl GoogleCredentials {
         if credentials_path.exists() {
             let credentials_json = std::fs::read_to_string(credentials_path)?;
             let credentials: GoogleCredentials = serde_json::from_str(&credentials_json)?;
+            Self::validate_credentials(&credentials.installed.client_id, &credentials.installed.client_secret)?;
             Ok(credentials)
+        } else if std::env::var("CI").is_ok() || std::env::var("TESTING").is_ok() {
+            // Explicit test mode for CI/testing
+            Ok(Self::test_credentials())
         } else {
-            // Return test credentials for CI/testing
-            Ok(GoogleCredentials {
-                installed: InstalledApp {
-                    client_id: "test_client_id".to_string(),
-                    client_secret: "test_client_secret".to_string(),
-                    auth_uri: "https://accounts.google.com/o/oauth2/auth".to_string(),
-                    token_uri: "https://oauth2.googleapis.com/token".to_string(),
-                },
-            })
+            Err("credentials.json not found. For testing, set CI=true or TESTING=true environment variable".into())
+        }
+    }
+
+    fn validate_credentials(client_id: &str, client_secret: &str) -> Result<(), Box<dyn std::error::Error>> {
+        // Validate client_id format (Google OAuth client IDs have specific patterns)
+        if !client_id.contains(".apps.googleusercontent.com") {
+            return Err(format!("Invalid client_id format: '{}' (should contain '.apps.googleusercontent.com')", client_id).into());
+        }
+
+        // Validate client_secret format (Google secrets start with GOCSPX-)
+        if !client_secret.starts_with("GOCSPX-") {
+            return Err(format!("Invalid client_secret format: starts with '{}...' (should start with 'GOCSPX-')", &client_secret[..std::cmp::min(8, client_secret.len())]).into());
+        }
+
+        // Check minimum lengths
+        if client_id.len() < 20 {
+            return Err(format!("client_id too short: {} characters (should be at least 20)", client_id.len()).into());
+        }
+        if client_secret.len() < 20 {
+            return Err(format!("client_secret too short: {} characters (should be at least 20)", client_secret.len()).into());
+        }
+
+        Ok(())
+    }
+
+    fn test_credentials() -> Self {
+        GoogleCredentials {
+            installed: InstalledApp {
+                client_id: "test_client_id".to_string(),
+                client_secret: "test_client_secret".to_string(),
+                auth_uri: "https://accounts.google.com/o/oauth2/auth".to_string(),
+                token_uri: "https://oauth2.googleapis.com/token".to_string(),
+            },
         }
     }
 }
