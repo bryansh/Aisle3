@@ -1,6 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { emailService } from '../../lib/services/emailService.js';
-import { mockEmails, mockConversations, resetMocks } from '../__mocks__/tauri.js';
+import { mockEmailFactory, resetMocks } from '../utils/testHelpers.js';
+
+// Create mock emails using the factory
+const mockEmails = [
+  mockEmailFactory.unread({ id: 'email1' }),
+  mockEmailFactory.read({ id: 'email2' })
+];
+
+const mockConversations = [
+  mockEmailFactory.conversation({ thread_id: 'thread1' })
+];
 
 // Mock the Tauri invoke function
 vi.mock('@tauri-apps/api/core', () => ({
@@ -11,7 +21,8 @@ import { invoke } from '@tauri-apps/api/core';
 
 describe('EmailService', () => {
   beforeEach(() => {
-    resetMocks();
+    // Reset Tauri mocks
+    vi.clearAllMocks();
     vi.clearAllMocks();
   });
 

@@ -2,6 +2,9 @@ use aisle3::gmail_auth::AuthTokens;
 use std::fs;
 use tempfile::tempdir;
 
+mod common;
+use common::create_test_tokens;
+
 // Test helper to create temporary auth file
 fn create_temp_auth_file(tokens: &AuthTokens) -> tempfile::TempDir {
     let temp_dir = tempdir().unwrap();
@@ -11,13 +14,7 @@ fn create_temp_auth_file(tokens: &AuthTokens) -> tempfile::TempDir {
     temp_dir
 }
 
-fn create_test_tokens() -> AuthTokens {
-    AuthTokens {
-        access_token: "test_access_token".to_string(),
-        refresh_token: Some("test_refresh_token".to_string()),
-        expires_in: Some(3600), // 1 hour in seconds
-    }
-}
+// Moved to common/mod.rs - use common::create_test_tokens instead
 
 #[tokio::test]
 async fn test_auth_token_serialization() {

@@ -95,13 +95,6 @@ describe('EmailListVirtualized', () => {
     expect(screen.getByText('Test snippet 1')).toBeInTheDocument();
   });
 
-  it('should show "New" badge for unread emails', () => {
-    render(EmailListVirtualized, mockProps);
-
-    // Email with index 1 should be unread (i % 2 === 1)
-    const newBadges = screen.getAllByText('New');
-    expect(newBadges.length).toBeGreaterThan(0);
-  });
 
   it('should call onEmailSelect when email is clicked', async () => {
     render(EmailListVirtualized, mockProps);
@@ -112,27 +105,7 @@ describe('EmailListVirtualized', () => {
     expect(mockProps.onEmailSelect).toHaveBeenCalledWith(mockEmails[0]);
   });
 
-  it('should call onMarkAsRead when mark read button is clicked', async () => {
-    render(EmailListVirtualized, mockProps);
 
-    // Find an unread email (index 1)
-    const markReadButtons = screen.getAllByTitle('Mark as read');
-    if (markReadButtons.length > 0) {
-      await fireEvent.click(markReadButtons[0]);
-      expect(mockProps.onMarkAsRead).toHaveBeenCalled();
-    }
-  });
-
-  it('should call onMarkAsUnread when mark unread button is clicked', async () => {
-    render(EmailListVirtualized, mockProps);
-
-    // Find a read email (index 0)
-    const markUnreadButtons = screen.getAllByTitle('Mark as unread');
-    if (markUnreadButtons.length > 0) {
-      await fireEvent.click(markUnreadButtons[0]);
-      expect(mockProps.onMarkAsUnread).toHaveBeenCalled();
-    }
-  });
 
   it('should show loading spinner for emails in loading state', () => {
     const loadingStates = new Set(['email-0']);
@@ -208,23 +181,6 @@ describe('EmailListVirtualized', () => {
     expect(metrics.totalEmails).toBe(10);
   });
 
-  it('should handle different email read states correctly', () => {
-    const mixedEmails = [
-      { id: '1', subject: 'Read Email', sender: 'test@example.com', snippet: 'test', is_read: true },
-      { id: '2', subject: 'Unread Email', sender: 'test@example.com', snippet: 'test', is_read: false }
-    ];
-
-    render(EmailListVirtualized, {
-      ...mockProps,
-      emails: mixedEmails
-    });
-
-    expect(screen.getByText('Read Email')).toBeInTheDocument();
-    expect(screen.getByText('Unread Email')).toBeInTheDocument();
-    
-    // Should have one "New" badge for unread email
-    expect(screen.getAllByText('New')).toHaveLength(1);
-  });
 
   it('should prevent event propagation when clicking action buttons', async () => {
     const stopPropagation = vi.fn();

@@ -83,7 +83,26 @@ export const mockEmailFactory = {
       date: new Date(2023, 11, 1, index % 24).toISOString(),
       is_read: index % 3 === 0, // Some read, some unread
       ...overrides
-    }))
+    })),
+
+  /**
+   * Create a conversation object with nested emails
+   */
+  conversation: (overrides = {}) => ({
+    thread_id: 'thread-789',
+    subject: 'Test Conversation',
+    sender: 'conversation@example.com',
+    snippet: 'Latest message in conversation',
+    message_count: 3,
+    has_unread: true,
+    latest_date: '2023-12-01T10:00:00Z',
+    emails: [
+      mockEmailFactory.read({ id: 'conv-email-1', thread_id: 'thread-789' }),
+      mockEmailFactory.read({ id: 'conv-email-2', thread_id: 'thread-789' }),
+      mockEmailFactory.unread({ id: 'conv-email-3', thread_id: 'thread-789' })
+    ],
+    ...overrides
+  })
 };
 
 // ===== AUTHENTICATION MOCK FACTORIES =====

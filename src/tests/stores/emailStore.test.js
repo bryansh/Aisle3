@@ -13,7 +13,17 @@ import {
   emailOperations,
   navigationOperations
 } from '../../lib/stores/emailStore.js';
-import { mockEmails, mockConversations, resetMocks } from '../__mocks__/tauri.js';
+import { mockEmailFactory } from '../utils/testHelpers.js';
+
+// Create mock emails using the factory
+const mockEmails = [
+  mockEmailFactory.unread({ id: 'email1' }),
+  mockEmailFactory.read({ id: 'email2' })
+];
+
+const mockConversations = [
+  mockEmailFactory.conversation({ thread_id: 'thread1' })
+];
 
 // Mock the Tauri invoke function
 vi.mock('@tauri-apps/api/core', () => ({
@@ -33,7 +43,7 @@ describe('EmailStore', () => {
     selectedEmail.set(null);
     selectedConversation.set(null);
     
-    resetMocks();
+    // Reset mocks
     vi.clearAllMocks();
     
     // Set up invoke mock defaults based on the commands that emailService uses

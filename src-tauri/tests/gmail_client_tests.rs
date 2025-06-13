@@ -1,8 +1,10 @@
-use aisle3::gmail_auth::AuthTokens;
 use aisle3::gmail_client::*;
 use base64::{engine::general_purpose::URL_SAFE, Engine as _};
 use mockito::Server;
 use serde_json::json;
+
+mod common;
+use common::create_test_tokens;
 
 fn create_test_message() -> GmailMessage {
     GmailMessage {
@@ -39,13 +41,8 @@ fn create_test_message() -> GmailMessage {
     }
 }
 
-fn create_test_auth_tokens() -> AuthTokens {
-    AuthTokens {
-        access_token: "test_access_token".to_string(),
-        refresh_token: Some("test_refresh_token".to_string()),
-        expires_in: Some(3600), // 1 hour in seconds
-    }
-}
+// Moved to common/mod.rs - use common::create_test_tokens instead
+// Renamed from create_test_auth_tokens to create_test_tokens for consistency
 
 #[test]
 fn test_gmail_message_get_subject() {
@@ -163,7 +160,7 @@ fn test_gmail_response_deserialization() {
 
 #[tokio::test]
 async fn test_gmail_client_creation() {
-    let tokens = create_test_auth_tokens();
+    let tokens = create_test_tokens();
     let _client = GmailClient::new(&tokens);
     // Client creation should not panic
 }
@@ -246,7 +243,7 @@ async fn test_get_profile_success() {
         .await;
 
     // Create client with test tokens
-    let tokens = create_test_auth_tokens();
+    let tokens = create_test_tokens();
     let _client = GmailClient::new(&tokens);
 
     // Note: This test demonstrates mock HTTP structure
