@@ -1,6 +1,6 @@
+use crate::gmail_auth::AuthTokens;
 use keyring::{Entry, Error as KeyringError};
 use serde::{Deserialize, Serialize};
-use crate::gmail_auth::AuthTokens;
 
 const SERVICE_NAME: &str = "com.aisle3.app";
 const TOKEN_KEY: &str = "gmail_tokens";
@@ -13,13 +13,14 @@ impl SecureStorage {
     pub fn save_tokens(tokens: &AuthTokens) -> Result<(), String> {
         let entry = Entry::new(SERVICE_NAME, TOKEN_KEY)
             .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
-        
+
         let json = serde_json::to_string(tokens)
             .map_err(|e| format!("Failed to serialize tokens: {}", e))?;
-        
-        entry.set_password(&json)
+
+        entry
+            .set_password(&json)
             .map_err(|e| format!("Failed to save tokens to keyring: {}", e))?;
-        
+
         Ok(())
     }
 
@@ -27,16 +28,15 @@ impl SecureStorage {
     pub fn load_tokens() -> Result<AuthTokens, String> {
         let entry = Entry::new(SERVICE_NAME, TOKEN_KEY)
             .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
-        
-        let json = entry.get_password()
-            .map_err(|e| match e {
-                KeyringError::NoEntry => "No tokens found in keyring".to_string(),
-                _ => format!("Failed to load tokens from keyring: {}", e),
-            })?;
-        
+
+        let json = entry.get_password().map_err(|e| match e {
+            KeyringError::NoEntry => "No tokens found in keyring".to_string(),
+            _ => format!("Failed to load tokens from keyring: {}", e),
+        })?;
+
         let tokens: AuthTokens = serde_json::from_str(&json)
             .map_err(|e| format!("Failed to deserialize tokens: {}", e))?;
-        
+
         Ok(tokens)
     }
 
@@ -44,13 +44,12 @@ impl SecureStorage {
     pub fn delete_tokens() -> Result<(), String> {
         let entry = Entry::new(SERVICE_NAME, TOKEN_KEY)
             .map_err(|e| format!("Failed to create keyring entry: {}", e))?;
-        
-        entry.delete_password()
-            .map_err(|e| match e {
-                KeyringError::NoEntry => return Ok(()), // Already deleted
-                _ => format!("Failed to delete tokens from keyring: {}", e),
-            })?;
-        
+
+        entry.delete_password().map_err(|e| match e {
+            KeyringError::NoEntry => return Ok(()), // Already deleted
+            _ => format!("Failed to delete tokens from keyring: {}", e),
+        })?;
+
         Ok(())
     }
 
@@ -60,7 +59,7 @@ impl SecureStorage {
             Ok(entry) => entry,
             Err(_) => return false,
         };
-        
+
         entry.get_password().is_ok()
     }
 
@@ -73,7 +72,7 @@ impl SecureStorage {
         // Read tokens from file
         let json = std::fs::read_to_string(file_path)
             .map_err(|e| format!("Failed to read token file: {}", e))?;
-        
+
         let tokens: AuthTokens = serde_json::from_str(&json)
             .map_err(|e| format!("Failed to parse token file: {}", e))?;
 
