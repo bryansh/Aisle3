@@ -80,6 +80,23 @@ global.console = {
   error: vi.fn(),
 };
 
+// Mock Web Animations API for tests
+Element.prototype.animate = Element.prototype.animate || function() {
+  return {
+    cancel: () => {},
+    finish: () => {},
+    play: () => {},
+    pause: () => {},
+    reverse: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => {},
+    currentTime: 0,
+    playbackRate: 1,
+    playState: 'finished'
+  };
+};
+
 // Svelte 5 specific setup for testing
 import { beforeEach } from 'vitest';
 
