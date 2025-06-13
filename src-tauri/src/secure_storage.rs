@@ -53,7 +53,6 @@ impl SecureStorageBackend for KeyringBackend {
     }
 }
 
-
 /// Secure storage for OAuth tokens
 pub struct SecureStorage<T: SecureStorageBackend> {
     backend: T,
@@ -81,14 +80,14 @@ impl<T: SecureStorageBackend> SecureStorage<T> {
     pub fn save_tokens(&self, tokens: &AuthTokens) -> Result<(), String> {
         let json = serde_json::to_string(tokens)
             .map_err(|e| format!("Failed to serialize tokens: {}", e))?;
-        
+
         self.backend.save_password(TOKEN_KEY, &json)
     }
 
     /// Load tokens from secure storage
     pub fn load_tokens(&self) -> Result<AuthTokens, String> {
         let json = self.backend.get_password(TOKEN_KEY)?;
-        
+
         let tokens: AuthTokens = serde_json::from_str(&json)
             .map_err(|e| format!("Failed to deserialize tokens: {}", e))?;
 
@@ -191,7 +190,8 @@ mod tests {
 
         fn get_password(&self, key: &str) -> Result<String, String> {
             let storage = self.storage.lock().unwrap();
-            storage.get(key)
+            storage
+                .get(key)
                 .cloned()
                 .ok_or_else(|| "No tokens found in storage".to_string())
         }
@@ -214,7 +214,7 @@ mod tests {
         let storage = SecureStorage {
             backend: MockStorageBackend::new(),
         };
-        
+
         // Create test tokens
         let test_tokens = AuthTokens {
             access_token: "test_access_token".to_string(),

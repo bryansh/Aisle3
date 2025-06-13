@@ -7,6 +7,7 @@ use serde_json::json;
 fn create_test_message() -> GmailMessage {
     GmailMessage {
         id: "test123".to_string(),
+        thread_id: "thread456".to_string(),
         snippet: "Test message snippet".to_string(),
         label_ids: Some(vec!["UNREAD".to_string(), "INBOX".to_string()]),
         payload: Some(MessagePayload {
@@ -118,6 +119,7 @@ fn test_gmail_message_serialization() {
 fn test_gmail_message_deserialization() {
     let json = json!({
         "id": "test456",
+        "threadId": "thread789",
         "snippet": "Another test",
         "labelIds": ["UNREAD"],
         "payload": {
@@ -191,6 +193,7 @@ Content-Type: application/json; charset=UTF-8
 
 {
   "id": "msg1",
+  "threadId": "thread1",
   "snippet": "Test message",
   "labelIds": ["UNREAD"]
 }
@@ -328,4 +331,91 @@ fn test_header_case_insensitive() {
     }
 
     assert_eq!(message.get_subject(), "Test Subject");
+}
+
+// Email Threading Tests
+
+#[test]
+fn test_gmail_message_has_thread_id() {
+    // Test that GmailMessage struct properly deserializes thread_id
+    let json = json!({
+        "id": "msg123",
+        "threadId": "thread456",
+        "snippet": "Test message",
+        "labelIds": ["INBOX", "UNREAD"]
+    });
+
+    let message: GmailMessage = serde_json::from_value(json).unwrap();
+    assert_eq!(message.id, "msg123");
+    assert_eq!(message.thread_id, "thread456");
+    assert_eq!(message.snippet, "Test message");
+}
+
+#[test]
+fn test_gmail_message_ref_thread_id() {
+    // Test that GmailMessageRef properly handles threadId
+    let json = json!({
+        "id": "ref123",
+        "threadId": "thread789"
+    });
+
+    let msg_ref: GmailMessageRef = serde_json::from_value(json).unwrap();
+    assert_eq!(msg_ref.id, "ref123");
+    assert_eq!(msg_ref.thread_id, "thread789");
+}
+
+#[test]
+fn test_message_threading_headers() {
+    let mut message = create_test_message();
+
+    // Add threading headers
+    if let Some(ref mut payload) = message.payload {
+        if let Some(ref mut headers) = payload.headers {
+            headers.push(MessageHeader {
+                name: "Message-ID".to_string(),
+                value: "<msg123@example.com>".to_string(),
+            });
+            headers.push(MessageHeader {
+                name: "References".to_string(),
+                value: "<original@example.com> <reply1@example.com>".to_string(),
+            });
+        }
+    }
+
+    let message_id = message.get_message_id();
+    let references = message.get_references();
+
+    assert_eq!(message_id, Some("<msg123@example.com>".to_string()));
+    assert_eq!(
+        references,
+        Some("<original@example.com> <reply1@example.com>".to_string())
+    );
+}
+
+#[test]
+fn test_thread_id_preservation() {
+    let original_thread_id = "thread_preservation_test_123";
+    let mut message = create_test_message();
+    message.thread_id = original_thread_id.to_string();
+
+    // Serialize and deserialize to ensure thread_id is preserved
+    let json = serde_json::to_value(&message).unwrap();
+    let deserialized: GmailMessage = serde_json::from_value(json).unwrap();
+
+    assert_eq!(deserialized.thread_id, original_thread_id);
+}
+
+#[test]
+fn test_threading_with_missing_headers() {
+    let mut message = create_test_message();
+
+    // Remove all headers to test fallback behavior
+    if let Some(ref mut payload) = message.payload {
+        payload.headers = Some(vec![]);
+    }
+
+    assert_eq!(message.get_message_id(), None);
+    assert_eq!(message.get_references(), None);
+    // Thread ID should still be available from the message struct
+    assert_eq!(message.thread_id, "thread456");
 }

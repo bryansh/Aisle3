@@ -49,6 +49,21 @@
     return '';
   }
 
+  // Reactive content detection for button state
+  let hasEditorContent = $state(false);
+
+  // Update content detection when editor or replyBody changes
+  $effect(() => {
+    if (editor && replyBody !== undefined) {
+      const text = editor.getText();
+      const html = editor.getHTML();
+      // Check both plain text and if HTML has meaningful content
+      hasEditorContent = Boolean(text.trim().length > 0 || (html && html.replace(/<[^>]*>/g, '').trim().length > 0));
+    } else {
+      hasEditorContent = Boolean(replyBody.trim().length > 0);
+    }
+  });
+
   // Convert editor HTML to email-safe HTML
   function makeEmailSafe(html: string): string {
     // Simple email-safe conversions for common editor elements
@@ -171,7 +186,7 @@
 {#if isVisible}
   <!-- Simple Bottom Composer -->
   <div 
-    class="fixed bottom-0 left-0 right-0 h-[60vh] bg-white bg-opacity-90 backdrop-blur-md shadow-2xl border-t border-gray-300 z-50"
+    class="fixed bottom-2 left-0 right-0 h-[60vh] bg-white bg-opacity-90 backdrop-blur-md shadow-2xl border-t border-gray-300 z-50 rounded-t-lg"
     transition:slide={{ duration: 300, axis: 'y' }}
     role="dialog"
     aria-modal="true"
@@ -216,7 +231,7 @@
       {isSending}
       onSend={handleSend}
       onCancel={handleCancel}
-      isDisabled={!getPlainText().trim()}
+      isDisabled={!hasEditorContent}
     />
   </div>
 {/if}

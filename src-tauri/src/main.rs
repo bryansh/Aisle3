@@ -473,6 +473,7 @@ async fn send_reply(
             &reply_body,
             message_id.as_deref(),
             reply_references.as_deref(),
+            Some(&original_email.thread_id),
         )
         .await
     {

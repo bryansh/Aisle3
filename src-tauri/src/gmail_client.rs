@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GmailMessage {
     pub id: String,
+    #[serde(rename = "threadId")]
+    pub thread_id: String,
     pub snippet: String,
     #[serde(rename = "labelIds")]
     pub label_ids: Option<Vec<String>>,
@@ -306,6 +308,7 @@ impl GmailClient {
         body: &str,
         in_reply_to: Option<&str>,
         references: Option<&str>,
+        thread_id: Option<&str>,
     ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         // Detect if body contains HTML
         let is_html = body.contains('<') && (body.contains("</") || body.contains("/>"));
@@ -393,9 +396,14 @@ impl GmailClient {
         let encoded_email = URL_SAFE.encode(email_content.as_bytes());
 
         // Create the request payload
-        let send_request = serde_json::json!({
+        let mut send_request = serde_json::json!({
             "raw": encoded_email
         });
+
+        // Add thread ID if this is a reply
+        if let Some(tid) = thread_id {
+            send_request["threadId"] = serde_json::Value::String(tid.to_string());
+        }
 
         let url = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
 

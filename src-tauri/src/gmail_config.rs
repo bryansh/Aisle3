@@ -17,7 +17,7 @@ impl GoogleCredentials {
     pub fn from_env() -> Result<Self, Box<dyn std::error::Error>> {
         // Load .env file if it exists (for local development)
         let _ = dotenvy::dotenv();
-        
+
         if std::env::var("CI").is_ok() || std::env::var("TESTING").is_ok() {
             // Explicit test mode for CI/testing
             Ok(Self::test_credentials())
@@ -26,9 +26,9 @@ impl GoogleCredentials {
                 .map_err(|_| "GOOGLE_CLIENT_ID environment variable not set")?;
             let client_secret = std::env::var("GOOGLE_CLIENT_SECRET")
                 .map_err(|_| "GOOGLE_CLIENT_SECRET environment variable not set")?;
-            
+
             Self::validate_credentials(&client_id, &client_secret)?;
-            
+
             Ok(GoogleCredentials {
                 installed: InstalledApp {
                     client_id,

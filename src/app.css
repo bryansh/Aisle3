@@ -43,3 +43,11 @@ input[type="url"],
 textarea {
   cursor: text;
 }
+
+/* Editor areas should always show text cursor */
+.tiptap[contenteditable="true"],
+.ProseMirror[contenteditable="true"],
+[contenteditable="true"].tiptap,
+[contenteditable="true"].ProseMirror {
+  cursor: text;
+}

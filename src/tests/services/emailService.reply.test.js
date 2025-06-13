@@ -121,5 +121,39 @@ describe('EmailService Reply Functionality', () => {
       });
       expect(result).toBe(mockResult);
     });
+
+    it('should maintain threading when replying to emails', async () => {
+      const mockResult = 'Reply sent successfully! Message ID: threaded_reply_123';
+      invoke.mockResolvedValue(mockResult);
+      
+      const originalEmailId = 'original_email_456';
+      const replyBody = 'This reply should be threaded with the original conversation.';
+      
+      const result = await emailService.sendReply(originalEmailId, replyBody);
+      
+      // Verify the backend is called with original email ID for threading
+      expect(invoke).toHaveBeenCalledWith('send_reply', {
+        originalEmailId,
+        replyBody
+      });
+      expect(result).toBe(mockResult);
+    });
+
+    it('should handle replies to emails with existing thread chains', async () => {
+      const mockResult = 'Reply sent successfully! Message ID: chain_reply_789';
+      invoke.mockResolvedValue(mockResult);
+      
+      // Simulate replying to an email that's already part of a conversation
+      const threadedEmailId = 'threaded_email_789';
+      const replyBody = 'Adding to an existing conversation thread.';
+      
+      const result = await emailService.sendReply(threadedEmailId, replyBody);
+      
+      expect(invoke).toHaveBeenCalledWith('send_reply', {
+        originalEmailId: threadedEmailId,
+        replyBody
+      });
+      expect(result).toBe(mockResult);
+    });
   });
 });
