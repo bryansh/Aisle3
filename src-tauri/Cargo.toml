@@ -30,6 +30,7 @@ tokio = { version = "1.0", features = ["full"] }
 opener = "0.6"
 urlencoding = "2.1"
 dirs = "5.0"
+dotenvy = "0.15"
 # Removed webhook dependencies: warp, bytes, futures-util
 # google-cloud-pubsub = "0.22"  # Available when needed for full Pub/Sub integration
 

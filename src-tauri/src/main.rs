@@ -10,7 +10,7 @@ mod secure_storage;
 use gmail_auth::{parse_callback_url, AuthTokens, GmailAuth};
 use gmail_client::GmailClient;
 use rate_limiter::RateLimiter;
-use secure_storage::SecureStorage;
+use secure_storage::DefaultSecureStorage;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -286,7 +286,7 @@ async fn logout_gmail(state: State<'_, AppState>) -> Result<String, String> {
     *state.auth_tokens.lock().unwrap() = None;
 
     // Delete saved tokens from secure storage
-    SecureStorage::delete_tokens().map_err(|e| e.to_string())?;
+    DefaultSecureStorage::delete_tokens_static().map_err(|e| e.to_string())?;
 
     // Also clean up legacy file if it exists
     let token_file = get_token_file_path();
@@ -301,7 +301,7 @@ async fn logout_gmail(state: State<'_, AppState>) -> Result<String, String> {
 async fn get_auth_status(state: State<'_, AppState>) -> Result<bool, String> {
     let tokens = state.auth_tokens.lock().unwrap();
     // Check both in-memory tokens and secure storage
-    Ok(tokens.is_some() || SecureStorage::has_tokens())
+    Ok(tokens.is_some() || DefaultSecureStorage::has_tokens_static())
 }
 
 #[tauri::command]
@@ -319,21 +319,21 @@ fn get_token_file_path() -> PathBuf {
 }
 
 fn save_tokens(tokens: &AuthTokens) -> Result<(), Box<dyn std::error::Error>> {
-    SecureStorage::save_tokens(tokens).map_err(|e| e.into())
+    DefaultSecureStorage::save_tokens_static(tokens).map_err(|e| e.into())
 }
 
 fn load_tokens() -> Option<AuthTokens> {
     // First try to load from secure storage
-    if let Ok(tokens) = SecureStorage::load_tokens() {
+    if let Ok(tokens) = DefaultSecureStorage::load_tokens_static() {
         return Some(tokens);
     }
 
     // If no tokens in secure storage, try to migrate from old file
     let token_file = get_token_file_path();
     if token_file.exists() {
-        if let Ok(true) = SecureStorage::migrate_from_file(&token_file) {
+        if let Ok(true) = DefaultSecureStorage::migrate_from_file_static(&token_file) {
             // Migration successful, try loading again
-            return SecureStorage::load_tokens().ok();
+            return DefaultSecureStorage::load_tokens_static().ok();
         }
     }
 

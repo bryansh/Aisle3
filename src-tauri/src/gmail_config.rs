@@ -14,22 +14,29 @@ pub struct InstalledApp {
 }
 
 impl GoogleCredentials {
-    pub fn from_json() -> Result<Self, Box<dyn std::error::Error>> {
-        let credentials_path = std::path::Path::new("credentials.json");
-
-        if credentials_path.exists() {
-            let credentials_json = std::fs::read_to_string(credentials_path)?;
-            let credentials: GoogleCredentials = serde_json::from_str(&credentials_json)?;
-            Self::validate_credentials(
-                &credentials.installed.client_id,
-                &credentials.installed.client_secret,
-            )?;
-            Ok(credentials)
-        } else if std::env::var("CI").is_ok() || std::env::var("TESTING").is_ok() {
+    pub fn from_env() -> Result<Self, Box<dyn std::error::Error>> {
+        // Load .env file if it exists (for local development)
+        let _ = dotenvy::dotenv();
+        
+        if std::env::var("CI").is_ok() || std::env::var("TESTING").is_ok() {
             // Explicit test mode for CI/testing
             Ok(Self::test_credentials())
         } else {
-            Err("credentials.json not found. For testing, set CI=true or TESTING=true environment variable".into())
+            let client_id = std::env::var("GOOGLE_CLIENT_ID")
+                .map_err(|_| "GOOGLE_CLIENT_ID environment variable not set")?;
+            let client_secret = std::env::var("GOOGLE_CLIENT_SECRET")
+                .map_err(|_| "GOOGLE_CLIENT_SECRET environment variable not set")?;
+            
+            Self::validate_credentials(&client_id, &client_secret)?;
+            
+            Ok(GoogleCredentials {
+                installed: InstalledApp {
+                    client_id,
+                    client_secret,
+                    auth_uri: "https://accounts.google.com/o/oauth2/auth".to_string(),
+                    token_uri: "https://oauth2.googleapis.com/token".to_string(),
+                },
+            })
         }
     }
 

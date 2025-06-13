@@ -26,7 +26,7 @@ pub struct GmailAuth {
 
 impl GmailAuth {
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let credentials = GoogleCredentials::from_json()?;
+        let credentials = GoogleCredentials::from_env()?;
 
         let client = BasicClient::new(
             ClientId::new(credentials.installed.client_id),
