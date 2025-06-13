@@ -483,6 +483,22 @@ describe('SanitizationService', () => {
       expect(result.timestamp).toBe('2023-01-01');
       expect(result.is_read).toBe(false);
     });
+
+    it('should decode HTML entities in subject and snippet for proper display', () => {
+      const email = {
+        id: 'email123',
+        sender: 'test@example.com',
+        subject: 'Let&amp;#39;s meet tomorrow &amp; discuss',
+        snippet: 'We&amp;#39;ll need to review &lt;important&gt; items &amp; make decisions'
+      };
+      
+      const result = service.sanitizeEmailForDisplay(email);
+      
+      // HTML entities should be decoded for proper text display
+      expect(result.subject).toBe("Let's meet tomorrow & discuss");
+      // HTML tags should be removed for security, but entities should be decoded
+      expect(result.snippet).toBe("We'll need to review items & make decisions");
+    });
   });
 
   describe('getStats', () => {

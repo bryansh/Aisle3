@@ -3,6 +3,7 @@
   import { Badge, Button } from 'flowbite-svelte';
   import { Mail, MailOpen, MailX } from 'lucide-svelte';
   import VirtualScrollList from './VirtualScrollList.svelte';
+  import { SanitizationService } from '../services/sanitizationService.js';
 
   interface Email {
     id: string;
@@ -45,9 +46,17 @@
     renderRatio: 0 
   });
 
+  // Initialize sanitization service
+  const sanitizer = new SanitizationService();
+
   // Determine if we should use virtualization
   const shouldVirtualize = $derived(
     useVirtualization && emails.length > virtualizationThreshold
+  );
+
+  // Sanitize emails for safe display
+  const sanitizedEmails = $derived(
+    emails.map(email => sanitizer.sanitizeEmailForDisplay(email))
   );
 
   const handleToggleReadStatus = async (event: Event, email: Email) => {
@@ -96,7 +105,7 @@
   <!-- Virtualized Email List for Large Datasets -->
   <div in:fade={{ duration: 500, delay: 300 }} data-testid="email-list-virtualized">
     <div class="mb-4 text-sm text-gray-500">
-      Showing {emails.length} emails (virtualized for performance)
+      Showing {sanitizedEmails.length} emails (virtualized for performance)
       {#if scrollStats.totalItems > 0}
         - Rendering {scrollStats.renderedItems} of {scrollStats.totalItems} items
       {/if}
@@ -104,7 +113,7 @@
     
     <VirtualScrollList
       bind:this={virtualScrollRef}
-      items={emails}
+      items={sanitizedEmails}
       {itemHeight}
       {containerHeight}
       overscan={10}
@@ -163,7 +172,7 @@
   <!-- Regular Email List for Small Datasets -->
   <div in:fade={{ duration: 500, delay: 300 }} data-testid="email-list">
     <div class="space-y-3">
-      {#each emails as email}
+      {#each sanitizedEmails as email}
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div 

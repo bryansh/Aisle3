@@ -372,9 +372,40 @@ export class HtmlSanitizer {
       '&nbsp;': '\u00A0' // Use non-breaking space character instead of regular space
     };
 
-    return text.replace(/&[a-zA-Z0-9#]+;/g, (entity) => {
+    let decoded = text;
+    
+    // Handle double-encoded entities by decoding twice
+    // First pass: decode &amp; back to &
+    decoded = decoded.replace(/&amp;/g, '&');
+    
+    // Second pass: decode all entities
+    decoded = decoded.replace(/&[a-zA-Z0-9#]+;/g, (entity) => {
       return entities[entity] || entity;
     });
+
+    return decoded;
+  }
+
+  /**
+   * Escape HTML special characters to prevent XSS
+   * @param {string} text - Text to escape
+   * @returns {string} Escaped text
+   */
+  static escapeHtml(text) {
+    if (!text || typeof text !== 'string') {
+      return '';
+    }
+
+    /** @type {Record<string, string>} */
+    const escapeMap = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    };
+
+    return text.replace(/[&<>"']/g, (char) => escapeMap[char] || char);
   }
 }
 
@@ -598,7 +629,9 @@ export class SanitizationService {
 
     // Sanitize subject
     if (sanitized.subject) {
-      sanitized.subject = InputSanitizer.sanitizeText(sanitized.subject, {
+      // First decode HTML entities, then sanitize
+      const decodedSubject = HtmlSanitizer.decodeHtmlEntities(sanitized.subject);
+      sanitized.subject = InputSanitizer.sanitizeText(decodedSubject, {
         maxLength: 500,
         preserveLineBreaks: false
       });
@@ -611,7 +644,9 @@ export class SanitizationService {
 
     // Sanitize snippet
     if (sanitized.snippet) {
-      sanitized.snippet = InputSanitizer.sanitizeText(sanitized.snippet, {
+      // First decode HTML entities, then sanitize
+      const decodedSnippet = HtmlSanitizer.decodeHtmlEntities(sanitized.snippet);
+      sanitized.snippet = InputSanitizer.sanitizeText(decodedSnippet, {
         maxLength: 300,
         preserveLineBreaks: false
       });
