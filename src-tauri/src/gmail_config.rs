@@ -22,10 +22,16 @@ impl GoogleCredentials {
             // Explicit test mode for CI/testing
             Ok(Self::test_credentials())
         } else {
-            let client_id = std::env::var("GOOGLE_CLIENT_ID")
-                .map_err(|_| "GOOGLE_CLIENT_ID environment variable not set")?;
-            let client_secret = std::env::var("GOOGLE_CLIENT_SECRET")
-                .map_err(|_| "GOOGLE_CLIENT_SECRET environment variable not set")?;
+            // Try embedded credentials first (for releases), then runtime env vars (for development)
+            let client_id = option_env!("GOOGLE_CLIENT_ID_EMBEDDED")
+                .map(String::from)
+                .or_else(|| std::env::var("GOOGLE_CLIENT_ID").ok())
+                .ok_or("GOOGLE_CLIENT_ID not found. For development, set GOOGLE_CLIENT_ID environment variable or create a .env file.")?;
+
+            let client_secret = option_env!("GOOGLE_CLIENT_SECRET_EMBEDDED")
+                .map(String::from)
+                .or_else(|| std::env::var("GOOGLE_CLIENT_SECRET").ok())
+                .ok_or("GOOGLE_CLIENT_SECRET not found. For development, set GOOGLE_CLIENT_SECRET environment variable or create a .env file.")?;
 
             Self::validate_credentials(&client_id, &client_secret)?;
 
