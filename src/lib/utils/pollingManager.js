@@ -423,7 +423,14 @@ export function createEmailPollingManager(emailOperations, config = {}) {
   // Set up email checking function
   pollingManager.setPollFunction(async () => {
     if (emailOperations && typeof emailOperations.checkForNewEmails === 'function') {
-      return await emailOperations.checkForNewEmails(true);
+      const result = await emailOperations.checkForNewEmails(true);
+      // Handle both old format (array) and new format (object with emailIds and emailDetails)
+      if (Array.isArray(result)) {
+        return result; // Legacy format - just email IDs
+      } else if (result && result.emailIds) {
+        return result; // New format - return the whole object
+      }
+      return []; // No new emails
     }
     throw new Error('Email operations not available');
   });

@@ -223,7 +223,18 @@ export class EmailService {
           await this.loadStats();
         }
         
-        return newEmailIds;
+        // Get the actual email details for the new emails
+        const newEmailDetails = newEmailIds
+          .map(/** @param {string} id */ id => this.emails.find(/** @param {any} email */ email => email.id === id))
+          .filter(/** @param {any} email */ email => email != null);
+        
+        console.log(`📬 Retrieved details for ${newEmailDetails.length} new emails`);
+        
+        // Return both IDs and details
+        return {
+          emailIds: newEmailIds,
+          emailDetails: newEmailDetails
+        };
       }
       
       return [];

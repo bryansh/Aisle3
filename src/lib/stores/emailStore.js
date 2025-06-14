@@ -209,7 +209,10 @@ export const emailOperations = {
 
   async checkForNewEmails(useBackgroundLoading = false) {
     try {
-      const newEmailIds = await emailService.checkForNewEmails(useBackgroundLoading);
+      const result = await emailService.checkForNewEmails(useBackgroundLoading);
+      
+      // Handle both old format (array) and new format (object with emailIds and emailDetails)
+      const newEmailIds = Array.isArray(result) ? result : (result && result.emailIds ? result.emailIds : []);
       
       if (newEmailIds.length > 0) {
         // Update stores with new data
@@ -219,7 +222,7 @@ export const emailOperations = {
         unreadCount.set(stats.unreadCount);
       }
       
-      return newEmailIds;
+      return result; // Return the original result format for compatibility
     } catch (error) {
       console.error('Error checking for new emails:', error);
       throw error;
