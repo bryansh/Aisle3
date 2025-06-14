@@ -47,6 +47,7 @@
   // Authentication state
   let isAuthenticated = $state(false);
   let isDemoMode = $state(false);
+  let isValidatingCredentials = $state(true);
   
   // Settings state (bound to settingsManager)
   let autoPollingEnabled = $state(settingsManager.getSetting('autoPollingEnabled'));
@@ -107,8 +108,13 @@
             }
           }
         }
+        
+        // Credential validation complete
+        isValidatingCredentials = false;
       } catch (error) {
         console.error('Error initializing app:', error);
+        // Even on error, stop showing loading screen
+        isValidatingCredentials = false;
       }
     };
 
@@ -309,7 +315,17 @@
 
 <main class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
   <div class="max-w-7xl mx-auto">
-    {#if isAuthenticated}
+    {#if isValidatingCredentials}
+      <div class="flex flex-col items-center justify-center min-h-[400px]">
+        <div class="mb-6">
+          <LoadingSpinner />
+        </div>
+        <h2 class="text-xl font-semibold text-gray-700 mb-2">Checking credentials...</h2>
+        <p class="text-gray-500 text-center max-w-md">
+          Please wait while we verify your authentication status.
+        </p>
+      </div>
+    {:else if isAuthenticated}
       {#if isDemoMode}
         <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
           <div class="flex items-center justify-between">
