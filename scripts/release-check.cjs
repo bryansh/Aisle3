@@ -149,11 +149,14 @@ function main() {
     log(`All checks passed and git working directory is clean.`, 'green');
   }
   
+  const currentVersion = getCurrentVersion();
+  const nextVersions = calculateNextVersions(currentVersion);
+  
   log(`\nTo release, run one of:`, 'blue');
-  log(`  npm run release:patch   # ${getCurrentVersion()} -> patch bump`, 'blue');
-  log(`  npm run release:minor   # ${getCurrentVersion()} -> minor bump`, 'blue');
-  log(`  npm run release:major   # ${getCurrentVersion()} -> major bump`, 'blue');
-  log(`  npm run release 1.2.3   # ${getCurrentVersion()} -> specific version`, 'blue');
+  log(`  npm run release:patch   # ${currentVersion} -> ${nextVersions.patch}`, 'blue');
+  log(`  npm run release:minor   # ${currentVersion} -> ${nextVersions.minor}`, 'blue');
+  log(`  npm run release:major   # ${currentVersion} -> ${nextVersions.major}`, 'blue');
+  log(`  npm run release x.y.z   # ${currentVersion} -> specific version`, 'blue');
 }
 
 main();
