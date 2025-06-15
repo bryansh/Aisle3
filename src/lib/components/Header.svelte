@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import { Button, Badge } from 'flowbite-svelte';
-  import { Mail, ArrowLeft, Download, RotateCw, LogOut, Settings, MessageSquare, Inbox } from 'lucide-svelte';
+  import { Mail, ArrowLeft, RotateCw, LogOut, Settings, MessageSquare, Inbox } from 'lucide-svelte';
 
   // Props
   interface Props {
@@ -29,37 +29,9 @@
   }: Props = $props();
 
   // Local state using runes
-  let checking_updates = $state(false);
   let loggingOut = $state(false);
-  let updateMessage = $state('');
-  let updateAvailable = $state(false);
 
   // Event handlers
-  const handleCheckUpdates = async () => {
-    checking_updates = true;
-    updateMessage = '';
-    updateAvailable = false;
-    try {
-      const result = await invoke<string>('check_for_updates');
-      updateMessage = result;
-      updateAvailable = result.includes('Update available');
-    } catch (error) {
-      updateMessage = `Error: ${error}`;
-    } finally {
-      checking_updates = false;
-    }
-  };
-
-  const handleInstallUpdate = async () => {
-    try {
-      updateMessage = 'Installing update...';
-      const result = await invoke<string>('install_update');
-      updateMessage = result;
-    } catch (error) {
-      updateMessage = `Install error: ${error}`;
-    }
-  };
-
   const handleLogoutGmail = async () => {
     loggingOut = true;
     try {
@@ -123,27 +95,6 @@
           </Button>
         {/if}
         
-        <Button 
-          color="blue" 
-          outline 
-          onclick={handleCheckUpdates}
-          disabled={checking_updates}
-        >
-          {#if checking_updates}
-            <RotateCw class="w-4 h-4 mr-2 animate-spin" />
-            Checking...
-          {:else}
-            <RotateCw class="w-4 h-4 mr-2" />
-            Check Updates
-          {/if}
-        </Button>
-        
-        {#if updateAvailable}
-          <Button color="blue" onclick={handleInstallUpdate}>
-            <Download class="w-4 h-4 mr-2" />
-            Install Update
-          </Button>
-        {/if}
 
         {#if isAuthenticated}
           <Button 

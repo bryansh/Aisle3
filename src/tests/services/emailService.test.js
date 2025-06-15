@@ -116,13 +116,19 @@ describe('EmailService', () => {
 
   describe('checkForNewEmails', () => {
     it('checks for new emails successfully', async () => {
-      const newEmails = [mockEmails[0]];
-      invoke.mockResolvedValue(newEmails);
+      const newEmailIds = [mockEmails[0].id];
+      invoke
+        .mockResolvedValueOnce(newEmailIds) // check_for_new_emails_since_last_check
+        .mockResolvedValueOnce(mockEmails)  // get_emails (loadEmails)
+        .mockResolvedValueOnce([10, 5]);    // get_inbox_stats (loadStats)
 
       const result = await emailService.checkForNewEmails();
 
       expect(invoke).toHaveBeenCalledWith('check_for_new_emails_since_last_check');
-      expect(result).toEqual(newEmails);
+      expect(result).toEqual({
+        emailIds: newEmailIds,
+        emailDetails: [mockEmails[0]]
+      });
     });
 
     it('handles check for new emails error', async () => {

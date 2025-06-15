@@ -534,6 +534,7 @@ fn main() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .manage(AppState {
             gmail_auth: Mutex::new(None),
             auth_tokens: Mutex::new(saved_tokens),

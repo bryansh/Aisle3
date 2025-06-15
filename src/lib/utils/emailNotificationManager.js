@@ -12,11 +12,14 @@ export class EmailNotificationManager {
     this.lastNotificationTime = null;
     this.notifiedEmailIds = new Set(); // Track which emails we've already notified about
     this.isInitialized = false;
+    /** @type {Function[]} */
+    this.inAppNotificationListeners = []; // Listeners for in-app notifications
     
     // Default settings
     this.settings = {
       enabled: true,
       osNotificationsEnabled: true,
+      inAppNotificationsEnabled: true, // Fallback when OS notifications disabled
       pollingEnabled: true,
       pollingIntervalSeconds: 30,
       notificationCooldownMinutes: 1, // Minimum time between notifications
@@ -82,10 +85,10 @@ export class EmailNotificationManager {
     try {
       // Handle both old format (array) and new format (object with emailIds and emailDetails)
       if (Array.isArray(result.data)) {
-        // Legacy format - just email IDs
+        // Legacy format - just email IDs, convert to new format with empty details
         const newEmailIds = result.data;
         if (newEmailIds.length > 0) {
-          await this.processNewEmails(newEmailIds);
+          await this.processNewEmailsWithDetails(newEmailIds, []);
         }
       } else if (result.data && /** @type {any} */ (result.data).emailIds) {
         // New format - has both IDs and details
@@ -99,37 +102,6 @@ export class EmailNotificationManager {
     }
   }
 
-  /**
-   * Process new emails and send notifications
-   * @param {Array<string>} newEmailIds - Array of new email IDs
-   */
-  async processNewEmails(newEmailIds) {
-    if (!this.settings.enabled || !this.shouldNotify()) {
-      return;
-    }
-
-    // Filter out emails we've already notified about
-    const emailsToNotify = newEmailIds.filter(id => !this.notifiedEmailIds.has(id));
-    
-    if (emailsToNotify.length === 0) {
-      return;
-    }
-
-    // Add to notified set
-    emailsToNotify.forEach(id => this.notifiedEmailIds.add(id));
-
-    // Get email details for notification
-    const emailDetails = await this.getEmailDetails(emailsToNotify);
-    console.log('📧 Email details for notification:', emailDetails);
-
-    // Send notification
-    await this.sendEmailNotification(emailsToNotify.length, emailDetails);
-
-    // Update last notification time
-    this.lastNotificationTime = Date.now();
-
-    console.log(`📧 Notified about ${emailsToNotify.length} new emails`);
-  }
 
   /**
    * Process new emails with details already available and send notifications
@@ -167,87 +139,139 @@ export class EmailNotificationManager {
     console.log(`📧 Notified about ${emailsToNotify.length} new emails with details`);
   }
 
+
   /**
-   * Get email details for notification
-   * @param {Array<string>} emailIds - Array of email IDs
-   * @returns {Promise<Array<Object>>} Array of email objects with details
+   * Add a listener for in-app notifications
+   * @param {Function} listener - Callback function for in-app notifications
+   * @returns {Function} Unsubscribe function
    */
-  async getEmailDetails(emailIds) {
-    console.log('📧 Getting email details for IDs:', emailIds);
-    
-    if (!this.emailOperations) {
-      console.log('📧 No email operations available');
-      return [];
-    }
-
-    try {
-      // Debug: Check what methods are available on emailOperations
-      console.log('📧 Available emailOperations methods:', Object.keys(this.emailOperations || {}));
-      
-      // Wait a bit for emails to be loaded into the store after detection
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Get current emails from the email operations/store
-      const allEmails = /** @type {any} */ (this.emailOperations).getEmails ? /** @type {any} */ (this.emailOperations).getEmails() : [];
-      console.log('📧 Total emails available:', allEmails.length);
-      console.log('📧 Sample email structure:', allEmails[0] ? Object.keys(allEmails[0]) : 'No emails');
-      
-      // If still no emails, try different methods to get email data
-      if (allEmails.length === 0) {
-        console.log('📧 Email store empty, trying alternative approaches...');
-        
-        // Try different possible method names
-        const possibleMethods = ['loadEmails', 'refreshEmails', 'fetchEmails', 'getEmailsList'];
-        for (const method of possibleMethods) {
-          if (/** @type {any} */ (this.emailOperations)[method]) {
-            console.log(`📧 Trying method: ${method}`);
-            try {
-              await /** @type {any} */ (this.emailOperations)[method]();
-              const emails = /** @type {any} */ (this.emailOperations).getEmails ? /** @type {any} */ (this.emailOperations).getEmails() : [];
-              console.log(`📧 After ${method}, emails available:`, emails.length);
-              if (emails.length > 0) break;
-            } catch (error) {
-              console.log(`📧 Method ${method} failed:`, error);
-            }
-          }
-        }
+  addInAppNotificationListener(listener) {
+    this.inAppNotificationListeners.push(listener);
+    return () => {
+      const index = this.inAppNotificationListeners.indexOf(listener);
+      if (index > -1) {
+        this.inAppNotificationListeners.splice(index, 1);
       }
-      
-      // Get final email list
-      const finalEmails = /** @type {any} */ (this.emailOperations).getEmails ? /** @type {any} */ (this.emailOperations).getEmails() : [];
-      
-      // Find the emails that match our IDs
-      const emailDetails = emailIds
-        .map(id => finalEmails.find(/** @param {any} email */ email => email.id === id))
-        .filter(email => email != null)
-        .slice(0, this.settings.maxEmailsToShow); // Limit number of emails
-
-      console.log('📧 Found matching emails:', emailDetails.length);
-      console.log('📧 Email details:', emailDetails);
-
-      return emailDetails;
-    } catch (error) {
-      console.error('❌ Failed to get email details:', error);
-      return [];
-    }
+    };
   }
 
   /**
-   * Send email notification
+   * Emit in-app notification
+   * @param {Object} notification - Notification data
+   */
+  emitInAppNotification(notification) {
+    this.inAppNotificationListeners.forEach(listener => {
+      try {
+        listener(notification);
+      } catch (error) {
+        console.warn('Error in in-app notification listener:', error);
+      }
+    });
+  }
+
+  /**
+   * Send email notification (OS and/or in-app)
    * @param {number} count - Number of new emails
    * @param {Array<Object>} emailDetails - Array of email objects
    */
   async sendEmailNotification(count, emailDetails = []) {
-    if (!this.settings.osNotificationsEnabled || !this.notificationService?.isAvailable()) {
-      console.log('📧 OS notifications not available, skipping email notification');
-      return;
+    let osNotificationSent = false;
+    let inAppNotificationSent = false;
+
+    // Try OS notification first if enabled
+    if (this.settings.osNotificationsEnabled && this.notificationService?.isAvailable()) {
+      try {
+        await this.notificationService.notifyNewEmails(count, emailDetails);
+        osNotificationSent = true;
+        console.log('📧 OS notification sent successfully');
+      } catch (error) {
+        console.error('❌ Failed to send OS notification:', error);
+      }
     }
 
-    try {
-      await this.notificationService.notifyNewEmails(count, emailDetails);
-    } catch (error) {
-      console.error('❌ Failed to send email notification:', error);
+    // Send in-app notification only if OS notification is disabled or failed
+    if (this.settings.inAppNotificationsEnabled && !osNotificationSent) {
+      try {
+        const message = this.formatInAppNotificationMessage(count, emailDetails);
+        this.emitInAppNotification({
+          type: 'email',
+          title: count === 1 && emailDetails.length > 0 
+            ? this.formatSingleEmailTitle(emailDetails[0])
+            : `${count} New Emails`,
+          message,
+          count,
+          emailDetails
+        });
+        inAppNotificationSent = true;
+        console.log('📧 In-app notification sent as fallback');
+      } catch (error) {
+        console.error('❌ Failed to send in-app notification:', error);
+      }
     }
+
+    if (!osNotificationSent && !inAppNotificationSent) {
+      console.log('📧 No notifications sent - all notification types disabled or failed');
+    }
+  }
+
+  /**
+   * Format title for single email notification
+   * @param {any} email - Email details
+   * @returns {string} Formatted title
+   */
+  formatSingleEmailTitle(email) {
+    const sender = email.sender || 'Unknown Sender';
+    const subject = email.subject || 'No subject';
+    
+    // Truncate sender if too long
+    const maxSenderLength = 25;
+    const truncatedSender = sender.length > maxSenderLength 
+      ? sender.substring(0, maxSenderLength) + '...' 
+      : sender;
+    
+    // Truncate subject if too long
+    const maxSubjectLength = 35;
+    const truncatedSubject = subject.length > maxSubjectLength 
+      ? subject.substring(0, maxSubjectLength) + '...' 
+      : subject;
+    
+    return `**${truncatedSender}** ${truncatedSubject}`;
+  }
+
+  /**
+   * Format message for in-app notification
+   * @param {number} count - Number of emails
+   * @param {Array<any>} emailDetails - Email details
+   * @returns {string} Formatted message
+   */
+  formatInAppNotificationMessage(count, emailDetails) {
+    if (count === 1 && emailDetails.length > 0) {
+      const email = emailDetails[0];
+      // For single emails, show a preview of the message content
+      const preview = email.preview || email.snippet || email.body || '';
+      const maxPreviewLength = 80;
+      const truncatedPreview = preview.length > maxPreviewLength 
+        ? preview.substring(0, maxPreviewLength) + '...' 
+        : preview;
+      
+      return truncatedPreview || 'No preview available';
+    } else if (count > 1) {
+      if (emailDetails.length > 0) {
+        const senders = emailDetails.slice(0, this.settings.maxEmailsToShow)
+          .map(email => email.sender)
+          .filter(sender => sender);
+        
+        if (senders.length > 0) {
+          const senderList = senders.join(', ');
+          const remainingCount = count - senders.length;
+          return remainingCount > 0 
+            ? `From: ${senderList} and ${remainingCount} others`
+            : `From: ${senderList}`;
+        }
+      }
+      return `You have ${count} new emails`;
+    }
+    return 'You have new email';
   }
 
   /**
@@ -383,6 +407,7 @@ export class EmailNotificationManager {
       this.pollingManager.cleanup();
     }
     this.notifiedEmailIds.clear();
+    this.inAppNotificationListeners.length = 0;
     this.emailOperations = null;
     this.notificationService = null;
     this.isInitialized = false;

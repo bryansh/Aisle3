@@ -60,7 +60,10 @@ describe('settingsManager', () => {
         autoPollingEnabled: false,
         pollingIntervalSeconds: 30,
         autoMarkReadEnabled: true,
-        autoMarkReadDelay: 1500
+        autoMarkReadDelay: 1500,
+        osNotificationsEnabled: true,
+        inAppNotificationsEnabled: true,
+        notificationAnimationMode: 'default'
       });
     });
   });
@@ -71,7 +74,10 @@ describe('settingsManager', () => {
         AUTO_POLLING_ENABLED: 'autoPollingEnabled',
         POLLING_INTERVAL_SECONDS: 'pollingIntervalSeconds',
         AUTO_MARK_READ_ENABLED: 'autoMarkReadEnabled',
-        AUTO_MARK_READ_DELAY: 'autoMarkReadDelay'
+        AUTO_MARK_READ_DELAY: 'autoMarkReadDelay',
+        OS_NOTIFICATIONS_ENABLED: 'osNotificationsEnabled',
+        IN_APP_NOTIFICATIONS_ENABLED: 'inAppNotificationsEnabled',
+        NOTIFICATION_ANIMATION_MODE: 'notificationAnimationMode'
       });
     });
   });
@@ -94,7 +100,10 @@ describe('settingsManager', () => {
         autoPollingEnabled: true,
         pollingIntervalSeconds: 60,
         autoMarkReadEnabled: false,
-        autoMarkReadDelay: 3000
+        autoMarkReadDelay: 3000,
+        osNotificationsEnabled: true,
+        inAppNotificationsEnabled: true,
+        notificationAnimationMode: 'default'
       });
     });
 

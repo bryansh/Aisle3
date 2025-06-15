@@ -9,6 +9,8 @@
   import Settings from './Settings.svelte';
   import ConversationList from './ConversationList.svelte';
   import ConversationViewer from './ConversationViewer.svelte';
+  import UpdateNotification from './UpdateNotification.svelte';
+  import InAppNotification from './InAppNotification.svelte';
   import DOMPurify from 'dompurify';
   import { decode } from 'he';
   import { performanceSuite } from '../utils/performance.js';
@@ -18,6 +20,8 @@
   import { SettingsManager } from '../utils/settingsManager.js';
   import { AuthManager, initializeAuth, handleAuthSuccess as handleAuthSuccessUtil } from '../utils/authManager.js';
   import { createEmailPollingManager } from '../utils/pollingManager.js';
+  import { createEmailNotificationManager } from '../utils/emailNotificationManager.js';
+  import { createUpdateManager } from '../utils/updateManager.js';
 
   // Import stores
   import {
@@ -43,17 +47,33 @@
   const settingsManager = new SettingsManager();
   let authManager: AuthManager;
   let pollingManager: any;
+  let emailNotificationManager: any;
+  let updateManager: any;
   
   // Authentication state
   let isAuthenticated = $state(false);
   let isDemoMode = $state(false);
   let isValidatingCredentials = $state(true);
+
+  // Update notification state
+  let showUpdateNotification = $state(false);
+  let updateNotificationType: 'available' | 'installing' | 'complete' | 'error' = $state('available');
+  let updateNotificationMessage = $state('');
+  
+  // In-app notification state
+  let showInAppNotification = $state(false);
+  let inAppNotificationType: 'email' | 'update' | 'info' | 'error' = $state('email');
+  let inAppNotificationTitle = $state('');
+  let inAppNotificationMessage = $state('');
   
   // Settings state (bound to settingsManager)
   let autoPollingEnabled = $state(settingsManager.getSetting('autoPollingEnabled'));
   let pollingIntervalSeconds = $state(settingsManager.getSetting('pollingIntervalSeconds'));
   let autoMarkReadEnabled = $state(settingsManager.getSetting('autoMarkReadEnabled'));
   let autoMarkReadDelay = $state(settingsManager.getSetting('autoMarkReadDelay'));
+  let osNotificationsEnabled = $state(settingsManager.getSetting('osNotificationsEnabled') ?? true);
+  let inAppNotificationsEnabled = $state(settingsManager.getSetting('inAppNotificationsEnabled') ?? true);
+  let notificationAnimationMode = $state(settingsManager.getSetting('notificationAnimationMode') ?? 'default');
 
   // Load settings from settingsManager
   const loadSettings = () => {
@@ -62,6 +82,9 @@
     pollingIntervalSeconds = settings.pollingIntervalSeconds;
     autoMarkReadEnabled = settings.autoMarkReadEnabled;
     autoMarkReadDelay = settings.autoMarkReadDelay;
+    osNotificationsEnabled = settings.osNotificationsEnabled ?? true;
+    inAppNotificationsEnabled = settings.inAppNotificationsEnabled ?? true;
+    notificationAnimationMode = settings.notificationAnimationMode ?? 'default';
   };
 
   // Save settings via settingsManager
@@ -70,7 +93,10 @@
       autoPollingEnabled,
       pollingIntervalSeconds,
       autoMarkReadEnabled,
-      autoMarkReadDelay
+      autoMarkReadDelay,
+      osNotificationsEnabled,
+      inAppNotificationsEnabled,
+      notificationAnimationMode
     });
   };
 
@@ -96,18 +122,49 @@
             isAuthenticated = authState.isAuthenticated;
           });
           
-          // Initialize polling manager if authenticated
+          // Initialize polling and notification managers if authenticated
           if (isAuthenticated) {
+            // Keep existing polling manager for manual checks
             pollingManager = createEmailPollingManager(emailOperations, {
               intervalSeconds: pollingIntervalSeconds,
-              enabled: autoPollingEnabled
+              enabled: false // Disable auto-polling, let notification manager handle it
             });
             
+            // Initialize email notification manager for auto-polling and notifications
+            emailNotificationManager = await createEmailNotificationManager(emailOperations, {
+              enabled: true,
+              osNotificationsEnabled: osNotificationsEnabled,
+              inAppNotificationsEnabled: inAppNotificationsEnabled,
+              pollingEnabled: autoPollingEnabled,
+              pollingIntervalSeconds: pollingIntervalSeconds,
+              notificationCooldownMinutes: 1 // 1 minute between notifications
+            });
+            
+            // Set up in-app notification listener only if in-app notifications are enabled
+            if (inAppNotificationsEnabled) {
+              emailNotificationManager.addInAppNotificationListener((notification: any) => {
+                handleInAppNotification(notification);
+              });
+            }
+            
             if (autoPollingEnabled) {
-              pollingManager.start();
+              emailNotificationManager.start();
             }
           }
         }
+        
+        // Initialize update manager
+        updateManager = createUpdateManager({
+          autoCheckEnabled: true,
+          checkIntervalHours: 1,
+          notifyOnStartup: true,
+          notifyOnUpdate: true
+        });
+        
+        // Set up update event listeners
+        updateManager.addListener((event: any) => {
+          handleUpdateEvent(event);
+        });
         
         // Credential validation complete
         isValidatingCredentials = false;
@@ -133,6 +190,7 @@
       }
     };
 
+
     document.addEventListener('keydown', handleKeydown);
     
     return () => {
@@ -142,8 +200,14 @@
       if (pollingManager) {
         pollingManager.cleanup();
       }
+      if (emailNotificationManager) {
+        emailNotificationManager.cleanup();
+      }
       if (authManager) {
         authManager.cleanup();
+      }
+      if (updateManager) {
+        updateManager.cleanup();
       }
       
       // Cleanup performance monitoring
@@ -157,14 +221,31 @@
     if (authManager) {
       const result = await handleAuthSuccessUtil(authManager, emailOperations);
       if (result.success) {
-        // Initialize polling manager for authenticated user
+        // Initialize polling manager for manual checks
         pollingManager = createEmailPollingManager(emailOperations, {
           intervalSeconds: pollingIntervalSeconds,
-          enabled: autoPollingEnabled
+          enabled: false
         });
         
+        // Initialize email notification manager for auto-polling and notifications
+        emailNotificationManager = await createEmailNotificationManager(emailOperations, {
+          enabled: true,
+          osNotificationsEnabled: osNotificationsEnabled,
+          inAppNotificationsEnabled: inAppNotificationsEnabled,
+          pollingEnabled: autoPollingEnabled,
+          pollingIntervalSeconds: pollingIntervalSeconds,
+          notificationCooldownMinutes: 1 // 1 minute between notifications
+        });
+        
+        // Set up in-app notification listener only if in-app notifications are enabled
+        if (inAppNotificationsEnabled) {
+          emailNotificationManager.addInAppNotificationListener((notification: any) => {
+            handleInAppNotification(notification);
+          });
+        }
+        
         if (autoPollingEnabled) {
-          pollingManager.start();
+          emailNotificationManager.start();
         }
       }
     }
@@ -185,6 +266,70 @@
 
   // Demo message state
   let showDemoMessage = $state(false);
+
+  // Update event handler
+  const handleUpdateEvent = (event: any) => {
+    console.log('📢 Update event:', event);
+    
+    switch (event.type) {
+      case 'update-available':
+        updateNotificationType = 'available';
+        updateNotificationMessage = event.message;
+        showUpdateNotification = true;
+        break;
+        
+      case 'update-install-start':
+        updateNotificationType = 'installing';
+        updateNotificationMessage = event.message;
+        showUpdateNotification = true;
+        break;
+        
+      case 'update-install-complete':
+        updateNotificationType = 'complete';
+        updateNotificationMessage = event.message;
+        showUpdateNotification = true;
+        break;
+        
+      case 'update-install-error':
+      case 'update-check-error':
+        updateNotificationType = 'error';
+        updateNotificationMessage = event.message;
+        showUpdateNotification = true;
+        break;
+        
+      case 'no-update':
+        // Only show "no update" message if it wasn't a silent check
+        if (!event.silent) {
+          updateNotificationType = 'complete';
+          updateNotificationMessage = 'You are running the latest version.';
+          showUpdateNotification = true;
+        }
+        break;
+    }
+  };
+
+  // Update notification handlers
+  const handleInstallUpdate = async () => {
+    if (updateManager) {
+      await updateManager.installUpdate();
+    }
+  };
+
+  const handleDismissUpdateNotification = () => {
+    showUpdateNotification = false;
+  };
+
+  // In-app notification handler
+  const handleInAppNotification = (notification: any) => {
+    inAppNotificationType = notification.type;
+    inAppNotificationTitle = notification.title;
+    inAppNotificationMessage = notification.message;
+    showInAppNotification = true;
+  };
+
+  const handleDismissInAppNotification = () => {
+    showInAppNotification = false;
+  };
 
   // Email selection handlers
   const handleEmailSelect = async (email: any) => {
@@ -223,16 +368,16 @@
     return emailOperations.markAsUnread(emailId);
   };
 
-  // Auto-polling functions (delegated to pollingManager)
+  // Auto-polling functions (delegated to emailNotificationManager)
   const startAutoPolling = () => {
-    if (pollingManager) {
-      pollingManager.start();
+    if (emailNotificationManager) {
+      emailNotificationManager.start();
     }
   };
 
   const stopAutoPolling = () => {
-    if (pollingManager) {
-      pollingManager.stop();
+    if (emailNotificationManager) {
+      emailNotificationManager.stop();
     }
   };
 
@@ -249,8 +394,14 @@
   const handleIntervalChanged = () => {
     console.log(`🔄 Polling interval changed to ${pollingIntervalSeconds} seconds`);
     
+    // Update both managers
     if (pollingManager) {
       pollingManager.setInterval(pollingIntervalSeconds);
+    }
+    if (emailNotificationManager) {
+      emailNotificationManager.updateSettings({
+        pollingIntervalSeconds: pollingIntervalSeconds
+      });
     }
     saveSettings();
   };
@@ -287,6 +438,25 @@
 
   const handleAutoMarkReadDelayChanged = () => {
     saveSettings();
+  };
+
+  const handleNotificationSettingsChanged = () => {
+    saveSettings();
+    
+    // Update the notification manager with new settings
+    if (emailNotificationManager) {
+      emailNotificationManager.updateSettings({
+        osNotificationsEnabled,
+        inAppNotificationsEnabled
+      });
+      
+      // Add or remove in-app notification listener based on settings
+      if (inAppNotificationsEnabled && !emailNotificationManager.inAppNotificationListeners.length) {
+        emailNotificationManager.addInAppNotificationListener((notification: any) => {
+          handleInAppNotification(notification);
+        });
+      }
+    }
   };
 
   // DOMPurify function
@@ -382,10 +552,14 @@
           bind:pollingInterval={pollingIntervalSeconds}
           bind:autoMarkReadEnabled
           bind:autoMarkReadDelay
+          bind:osNotificationsEnabled
+          bind:inAppNotificationsEnabled
+          bind:notificationAnimationMode
           onToggleAutoPolling={handleToggleAutoPolling}
           onIntervalChanged={handleIntervalChanged}
           onToggleAutoMarkRead={handleToggleAutoMarkRead}
           onAutoMarkReadDelayChanged={handleAutoMarkReadDelayChanged}
+          onNotificationSettingsChanged={handleNotificationSettingsChanged}
           onCheckNow={handleCheckNow}
         />
       {:else}
@@ -482,6 +656,25 @@
       </div>
     </div>
   {/if}
+
+  <!-- Update Notification -->
+  <UpdateNotification
+    show={showUpdateNotification}
+    type={updateNotificationType}
+    message={updateNotificationMessage}
+    onInstall={handleInstallUpdate}
+    onDismiss={handleDismissUpdateNotification}
+  />
+  
+  <!-- In-App Notification -->
+  <InAppNotification
+    show={showInAppNotification}
+    type={inAppNotificationType}
+    title={inAppNotificationTitle}
+    message={inAppNotificationMessage}
+    animationMode={notificationAnimationMode}
+    onClose={handleDismissInAppNotification}
+  />
 </main>
 
 <style>

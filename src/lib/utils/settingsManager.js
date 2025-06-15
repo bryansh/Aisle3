@@ -10,6 +10,9 @@
  * @property {number} pollingIntervalSeconds - Polling interval in seconds
  * @property {boolean} autoMarkReadEnabled - Whether auto-mark read is enabled
  * @property {number} autoMarkReadDelay - Auto-mark read delay in milliseconds
+ * @property {boolean} osNotificationsEnabled - Whether OS notifications are enabled
+ * @property {boolean} inAppNotificationsEnabled - Whether in-app notifications are enabled
+ * @property {'default' | 'quick'} notificationAnimationMode - Animation mode for in-app notifications
  */
 
 /**
@@ -20,18 +23,24 @@ export const DEFAULT_SETTINGS = {
   autoPollingEnabled: false,
   pollingIntervalSeconds: 30,
   autoMarkReadEnabled: true,
-  autoMarkReadDelay: 1500
+  autoMarkReadDelay: 1500,
+  osNotificationsEnabled: true,
+  inAppNotificationsEnabled: true,
+  notificationAnimationMode: 'default'
 };
 
 /**
  * Setting keys used in localStorage
- * @type {Readonly<{AUTO_POLLING_ENABLED: string, POLLING_INTERVAL_SECONDS: string, AUTO_MARK_READ_ENABLED: string, AUTO_MARK_READ_DELAY: string}>}
+ * @type {Readonly<{AUTO_POLLING_ENABLED: string, POLLING_INTERVAL_SECONDS: string, AUTO_MARK_READ_ENABLED: string, AUTO_MARK_READ_DELAY: string, OS_NOTIFICATIONS_ENABLED: string, IN_APP_NOTIFICATIONS_ENABLED: string, NOTIFICATION_ANIMATION_MODE: string}>}
  */
 export const SETTING_KEYS = /** @type {const} */ ({
   AUTO_POLLING_ENABLED: 'autoPollingEnabled',
   POLLING_INTERVAL_SECONDS: 'pollingIntervalSeconds',
   AUTO_MARK_READ_ENABLED: 'autoMarkReadEnabled',
-  AUTO_MARK_READ_DELAY: 'autoMarkReadDelay'
+  AUTO_MARK_READ_DELAY: 'autoMarkReadDelay',
+  OS_NOTIFICATIONS_ENABLED: 'osNotificationsEnabled',
+  IN_APP_NOTIFICATIONS_ENABLED: 'inAppNotificationsEnabled',
+  NOTIFICATION_ANIMATION_MODE: 'notificationAnimationMode'
 });
 
 /**
@@ -77,6 +86,24 @@ export function loadSettings() {
         settings.autoMarkReadDelay = parsed;
       }
     }
+    
+    // Load OS notifications enabled
+    const savedOsNotifications = localStorage.getItem(SETTING_KEYS.OS_NOTIFICATIONS_ENABLED);
+    if (savedOsNotifications !== null) {
+      settings.osNotificationsEnabled = JSON.parse(savedOsNotifications);
+    }
+    
+    // Load in-app notifications enabled
+    const savedInAppNotifications = localStorage.getItem(SETTING_KEYS.IN_APP_NOTIFICATIONS_ENABLED);
+    if (savedInAppNotifications !== null) {
+      settings.inAppNotificationsEnabled = JSON.parse(savedInAppNotifications);
+    }
+    
+    // Load notification animation mode
+    const savedAnimationMode = localStorage.getItem(SETTING_KEYS.NOTIFICATION_ANIMATION_MODE);
+    if (savedAnimationMode !== null && (savedAnimationMode === 'default' || savedAnimationMode === 'quick')) {
+      settings.notificationAnimationMode = savedAnimationMode;
+    }
 
     return settings;
   } catch (error) {
@@ -99,6 +126,9 @@ export function saveSettings(settings) {
     localStorage.setItem(SETTING_KEYS.POLLING_INTERVAL_SECONDS, settings.pollingIntervalSeconds.toString());
     localStorage.setItem(SETTING_KEYS.AUTO_MARK_READ_ENABLED, JSON.stringify(settings.autoMarkReadEnabled));
     localStorage.setItem(SETTING_KEYS.AUTO_MARK_READ_DELAY, settings.autoMarkReadDelay.toString());
+    localStorage.setItem(SETTING_KEYS.OS_NOTIFICATIONS_ENABLED, JSON.stringify(settings.osNotificationsEnabled));
+    localStorage.setItem(SETTING_KEYS.IN_APP_NOTIFICATIONS_ENABLED, JSON.stringify(settings.inAppNotificationsEnabled));
+    localStorage.setItem(SETTING_KEYS.NOTIFICATION_ANIMATION_MODE, settings.notificationAnimationMode);
   } catch (error) {
     console.warn('Error saving settings to localStorage:', error);
   }
