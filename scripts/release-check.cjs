@@ -66,6 +66,16 @@ function getCurrentVersion() {
   return packageJson.version;
 }
 
+function calculateNextVersions(currentVersion) {
+  const [major, minor, patch] = currentVersion.split('.').map(Number);
+  
+  return {
+    patch: `${major}.${minor}.${patch + 1}`,
+    minor: `${major}.${minor + 1}.0`,
+    major: `${major + 1}.0.0`
+  };
+}
+
 function main() {
   log(`${colors.bold}🚀 Aisle3 Release Readiness Check${colors.reset}`, 'blue');
   log(`Current version: v${getCurrentVersion()}`, 'blue');
