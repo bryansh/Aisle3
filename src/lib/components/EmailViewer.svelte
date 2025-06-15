@@ -23,13 +23,27 @@
     sanitizeEmailHtml: (html: string) => string;
     autoMarkReadDelay?: number;
     onReply?: (replyBody: string) => Promise<void>;
+    emailCompositionFormat?: 'html' | 'plaintext';
+    emailFontFamily?: string;
+    emailFontSize?: string;
+    autoSignatureEnabled?: boolean;
+    emailSignature?: string;
+    replyQuotePosition?: 'above' | 'below';
+    includeOriginalMessage?: boolean;
   }
 
   let { 
     email, 
     sanitizeEmailHtml,
     autoMarkReadDelay = 1500,
-    onReply
+    onReply,
+    emailCompositionFormat = 'html',
+    emailFontFamily = 'Arial, sans-serif',
+    emailFontSize = '14px',
+    autoSignatureEnabled = false,
+    emailSignature = '',
+    replyQuotePosition = 'below',
+    includeOriginalMessage = true
   }: Props = $props();
 
   let emailIframe: HTMLIFrameElement;
@@ -353,5 +367,12 @@
     onSend={handleSendReply}
     onCancel={handleCancelReply}
     isVisible={showReplyComposer}
+    {emailCompositionFormat}
+    {emailFontFamily}
+    {emailFontSize}
+    {autoSignatureEnabled}
+    {emailSignature}
+    {replyQuotePosition}
+    {includeOriginalMessage}
   />
 </div>

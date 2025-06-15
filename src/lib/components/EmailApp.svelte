@@ -76,6 +76,13 @@
   let osNotificationsEnabled = $state(true);
   let inAppNotificationsEnabled = $state(true);
   let notificationAnimationMode = $state<'default' | 'quick'>('default');
+  let emailCompositionFormat = $state<'html' | 'plaintext'>('html');
+  let emailFontFamily = $state('Arial, sans-serif');
+  let emailFontSize = $state('14px');
+  let autoSignatureEnabled = $state(false);
+  let emailSignature = $state('');
+  let replyQuotePosition = $state<'above' | 'below'>('below');
+  let includeOriginalMessage = $state(true);
 
   // Load settings from settingsManager
   const loadSettings = () => {
@@ -87,6 +94,13 @@
     osNotificationsEnabled = settings.osNotificationsEnabled ?? true;
     inAppNotificationsEnabled = settings.inAppNotificationsEnabled ?? true;
     notificationAnimationMode = settings.notificationAnimationMode ?? 'default';
+    emailCompositionFormat = settings.emailCompositionFormat ?? 'html';
+    emailFontFamily = settings.emailFontFamily ?? 'Arial, sans-serif';
+    emailFontSize = settings.emailFontSize ?? '14px';
+    autoSignatureEnabled = settings.autoSignatureEnabled ?? false;
+    emailSignature = settings.emailSignature ?? '';
+    replyQuotePosition = settings.replyQuotePosition ?? 'below';
+    includeOriginalMessage = settings.includeOriginalMessage ?? true;
   };
 
   // Save settings via settingsManager
@@ -99,7 +113,14 @@
         autoMarkReadDelay,
         osNotificationsEnabled,
         inAppNotificationsEnabled,
-        notificationAnimationMode
+        notificationAnimationMode,
+        emailCompositionFormat,
+        emailFontFamily,
+        emailFontSize,
+        autoSignatureEnabled,
+        emailSignature,
+        replyQuotePosition,
+        includeOriginalMessage
       });
     } else {
       settingsManager.updateSettings({
@@ -109,7 +130,14 @@
         autoMarkReadDelay,
         osNotificationsEnabled,
         inAppNotificationsEnabled,
-        notificationAnimationMode
+        notificationAnimationMode,
+        emailCompositionFormat,
+        emailFontFamily,
+        emailFontSize,
+        autoSignatureEnabled,
+        emailSignature,
+        replyQuotePosition,
+        includeOriginalMessage
       });
     }
   };
@@ -485,6 +513,10 @@
     }
   };
 
+  const handleCompositionSettingsChanged = async () => {
+    await saveSettings();
+  };
+
   // DOMPurify function
   function sanitizeEmailHtml(html: string): string {
     if (!html) return '';
@@ -570,6 +602,13 @@
             {sanitizeEmailHtml}
             autoMarkReadDelay={autoMarkReadEnabled ? autoMarkReadDelay : 0}
             onReply={handleEmailReply}
+            {emailCompositionFormat}
+            {emailFontFamily}
+            {emailFontSize}
+            {autoSignatureEnabled}
+            {emailSignature}
+            {replyQuotePosition}
+            {includeOriginalMessage}
           />
         {/if}
       {:else if $showSettings}
@@ -581,12 +620,20 @@
           bind:osNotificationsEnabled
           bind:inAppNotificationsEnabled
           bind:notificationAnimationMode
+          bind:emailCompositionFormat
+          bind:emailFontFamily
+          bind:emailFontSize
+          bind:autoSignatureEnabled
+          bind:emailSignature
+          bind:replyQuotePosition
+          bind:includeOriginalMessage
           isUsingTauriStore={isUsingTauriStore}
           onToggleAutoPolling={handleToggleAutoPolling}
           onIntervalChanged={handleIntervalChanged}
           onToggleAutoMarkRead={handleToggleAutoMarkRead}
           onAutoMarkReadDelayChanged={handleAutoMarkReadDelayChanged}
           onNotificationSettingsChanged={handleNotificationSettingsChanged}
+          onCompositionSettingsChanged={handleCompositionSettingsChanged}
           onCheckNow={handleCheckNow}
         />
       {:else}

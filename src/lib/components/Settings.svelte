@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
+  import CompositionPreview from './CompositionPreview.svelte';
 
   // Props
   interface Props {
@@ -10,12 +11,20 @@
     osNotificationsEnabled: boolean;
     inAppNotificationsEnabled: boolean;
     notificationAnimationMode: 'default' | 'quick';
+    emailCompositionFormat: 'html' | 'plaintext';
+    emailFontFamily: string;
+    emailFontSize: string;
+    autoSignatureEnabled: boolean;
+    emailSignature: string;
+    replyQuotePosition: 'above' | 'below';
+    includeOriginalMessage: boolean;
     isUsingTauriStore?: boolean;
     onToggleAutoPolling: () => void;
     onIntervalChanged: () => void;
     onToggleAutoMarkRead: () => void;
     onAutoMarkReadDelayChanged: () => void;
     onNotificationSettingsChanged: () => void;
+    onCompositionSettingsChanged: () => void;
     onCheckNow: () => void;
   }
 
@@ -27,12 +36,20 @@
     osNotificationsEnabled = $bindable(),
     inAppNotificationsEnabled = $bindable(),
     notificationAnimationMode = $bindable(),
+    emailCompositionFormat = $bindable(),
+    emailFontFamily = $bindable(),
+    emailFontSize = $bindable(),
+    autoSignatureEnabled = $bindable(),
+    emailSignature = $bindable(),
+    replyQuotePosition = $bindable(),
+    includeOriginalMessage = $bindable(),
     isUsingTauriStore = false,
     onToggleAutoPolling,
     onIntervalChanged,
     onToggleAutoMarkRead,
     onAutoMarkReadDelayChanged,
     onNotificationSettingsChanged,
+    onCompositionSettingsChanged,
     onCheckNow
   }: Props = $props();
 
@@ -53,6 +70,25 @@
     { value: 2000, label: '2 seconds' },
     { value: 3000, label: '3 seconds' },
     { value: 5000, label: '5 seconds' }
+  ];
+
+  // Available font families
+  const fontFamilyOptions = [
+    { value: 'Arial, sans-serif', label: 'Arial' },
+    { value: 'Helvetica, sans-serif', label: 'Helvetica' },
+    { value: 'Times New Roman, serif', label: 'Times New Roman' },
+    { value: 'Georgia, serif', label: 'Georgia' },
+    { value: 'Courier New, monospace', label: 'Courier New' },
+    { value: 'Verdana, sans-serif', label: 'Verdana' },
+    { value: 'system-ui, sans-serif', label: 'System Default' }
+  ];
+
+  // Available font sizes
+  const fontSizeOptions = [
+    { value: '12px', label: 'Small (12px)' },
+    { value: '14px', label: 'Medium (14px)' },
+    { value: '16px', label: 'Large (16px)' },
+    { value: '18px', label: 'Extra Large (18px)' }
   ];
 
   function handleToggleAutoPolling() {
@@ -77,6 +113,10 @@
 
   function handleNotificationSettingsChanged() {
     onNotificationSettingsChanged();
+  }
+
+  function handleCompositionSettingsChanged() {
+    onCompositionSettingsChanged();
   }
 
   // Update functionality state
@@ -378,5 +418,166 @@
         <span class="text-sm text-gray-500">Automatic read marking disabled - mark manually only</span>
       </div>
     {/if}
+  </div>
+
+  <!-- Email Composition Settings -->
+  <div class="bg-white rounded-lg border border-gray-200 p-4">
+    <h3 class="text-lg font-medium text-gray-800 mb-4">✉️ Email Composition</h3>
+    
+    <!-- Composition format -->
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <label for="composition-format" class="text-sm font-medium text-gray-700">Default format</label>
+        <p class="text-xs text-gray-500">Choose between rich text (HTML) or plain text</p>
+      </div>
+      <select 
+        id="composition-format"
+        bind:value={emailCompositionFormat}
+        onchange={handleCompositionSettingsChanged}
+        class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 shadow-sm w-48"
+      >
+        <option value="html">🎨 Rich Text (HTML)</option>
+        <option value="plaintext">📝 Plain Text</option>
+      </select>
+    </div>
+
+    <!-- Font family -->
+    <div class="flex items-center justify-between mb-4 {emailCompositionFormat === 'plaintext' ? 'opacity-50' : ''}">
+      <div>
+        <label for="font-family" class="text-sm font-medium text-gray-700">Font family</label>
+        <p class="text-xs text-gray-500">
+          {emailCompositionFormat === 'plaintext' ? 'Not used in plain text mode' : 'Default font for composing emails'}
+        </p>
+      </div>
+      <select 
+        id="font-family"
+        bind:value={emailFontFamily}
+        onchange={handleCompositionSettingsChanged}
+        disabled={emailCompositionFormat === 'plaintext'}
+        class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 shadow-sm w-48 disabled:bg-gray-100 disabled:cursor-not-allowed"
+      >
+        {#each fontFamilyOptions as option}
+          <option value={option.value}>{option.label}</option>
+        {/each}
+      </select>
+    </div>
+
+    <!-- Font size -->
+    <div class="flex items-center justify-between mb-4 {emailCompositionFormat === 'plaintext' ? 'opacity-50' : ''}">
+      <div>
+        <label for="font-size" class="text-sm font-medium text-gray-700">Font size</label>
+        <p class="text-xs text-gray-500">
+          {emailCompositionFormat === 'plaintext' ? 'Not used in plain text mode' : 'Default text size for composing emails'}
+        </p>
+      </div>
+      <select 
+        id="font-size"
+        bind:value={emailFontSize}
+        onchange={handleCompositionSettingsChanged}
+        disabled={emailCompositionFormat === 'plaintext'}
+        class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 shadow-sm w-48 disabled:bg-gray-100 disabled:cursor-not-allowed"
+      >
+        {#each fontSizeOptions as option}
+          <option value={option.value}>{option.label}</option>
+        {/each}
+      </select>
+    </div>
+
+    <!-- Auto-signature toggle -->
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <label for="auto-signature-toggle" class="text-sm font-medium text-gray-700">Automatic signature</label>
+        <p class="text-xs text-gray-500">Automatically add signature to outgoing emails</p>
+      </div>
+      <label class="relative inline-flex items-center cursor-pointer">
+        <input 
+          id="auto-signature-toggle"
+          type="checkbox" 
+          bind:checked={autoSignatureEnabled}
+          onchange={handleCompositionSettingsChanged}
+          class="sr-only peer"
+        />
+        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+      </label>
+    </div>
+
+    <!-- Signature text -->
+    {#if autoSignatureEnabled}
+      <div class="mb-4">
+        <label for="email-signature" class="block text-sm font-medium text-gray-700 mb-2">Email signature</label>
+        <textarea 
+          id="email-signature"
+          bind:value={emailSignature}
+          onchange={handleCompositionSettingsChanged}
+          placeholder="Enter your email signature..."
+          rows="3"
+          class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 shadow-sm resize-none"
+        ></textarea>
+        <p class="text-xs text-gray-500 mt-1">This signature will be automatically added to your emails</p>
+      </div>
+    {/if}
+
+    <!-- Reply settings -->
+    <div class="border-t border-gray-200 pt-4">
+      <h4 class="text-md font-medium text-gray-700 mb-3">Reply Settings</h4>
+      
+      <!-- Include original message -->
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <label for="include-original-toggle" class="text-sm font-medium text-gray-700">Include original message</label>
+          <p class="text-xs text-gray-500">Include the original email when replying</p>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input 
+            id="include-original-toggle"
+            type="checkbox" 
+            bind:checked={includeOriginalMessage}
+            onchange={handleCompositionSettingsChanged}
+            class="sr-only peer"
+          />
+          <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
+      </div>
+
+      <!-- Quote position -->
+      {#if includeOriginalMessage}
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <label for="quote-position" class="text-sm font-medium text-gray-700">Original message position</label>
+            <p class="text-xs text-gray-500">Where to place the original message in replies</p>
+          </div>
+          <select 
+            id="quote-position"
+            bind:value={replyQuotePosition}
+            onchange={handleCompositionSettingsChanged}
+            class="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 shadow-sm w-48"
+          >
+            <option value="below">📄 Below new message</option>
+            <option value="above">📄 Above new message</option>
+          </select>
+        </div>
+      {/if}
+    </div>
+
+    <!-- Live Preview -->
+    <div class="mt-6 pt-4 border-t border-gray-200">
+      <CompositionPreview
+        {emailCompositionFormat}
+        {emailFontFamily}
+        {emailFontSize}
+        {autoSignatureEnabled}
+        {emailSignature}
+        {replyQuotePosition}
+        {includeOriginalMessage}
+      />
+    </div>
+
+    <!-- Composition info -->
+    <div class="text-xs text-gray-500 space-y-1 mt-4 pt-4 border-t border-gray-200">
+      <p>• <strong>HTML format:</strong> Font settings apply only to content you compose (not quoted text)</p>
+      <p>• <strong>Plain text format:</strong> Font settings are ignored - recipients see default client font</p>
+      <p>• <strong>Quoted content:</strong> Usually retains original formatting from sender</p>
+      <p>• <strong>Signatures:</strong> Use your font settings in HTML mode, plain text in text mode</p>
+    </div>
   </div>
 </div>

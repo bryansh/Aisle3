@@ -13,6 +13,13 @@
  * @property {boolean} osNotificationsEnabled - Whether OS notifications are enabled
  * @property {boolean} inAppNotificationsEnabled - Whether in-app notifications are enabled
  * @property {'default' | 'quick'} notificationAnimationMode - Animation mode for in-app notifications
+ * @property {'html' | 'plaintext'} emailCompositionFormat - Default email composition format
+ * @property {string} emailFontFamily - Default font family for email composition
+ * @property {string} emailFontSize - Default font size for email composition
+ * @property {boolean} autoSignatureEnabled - Whether to automatically add signature to emails
+ * @property {string} emailSignature - Custom email signature text
+ * @property {'above' | 'below'} replyQuotePosition - Position of original message in replies
+ * @property {boolean} includeOriginalMessage - Whether to include original message in replies
  */
 
 /**
@@ -26,12 +33,19 @@ export const DEFAULT_SETTINGS = {
   autoMarkReadDelay: 1500,
   osNotificationsEnabled: true,
   inAppNotificationsEnabled: true,
-  notificationAnimationMode: 'default'
+  notificationAnimationMode: 'default',
+  emailCompositionFormat: 'html',
+  emailFontFamily: 'Arial, sans-serif',
+  emailFontSize: '14px',
+  autoSignatureEnabled: false,
+  emailSignature: '',
+  replyQuotePosition: 'below',
+  includeOriginalMessage: true
 };
 
 /**
  * Setting keys used in localStorage
- * @type {Readonly<{AUTO_POLLING_ENABLED: string, POLLING_INTERVAL_SECONDS: string, AUTO_MARK_READ_ENABLED: string, AUTO_MARK_READ_DELAY: string, OS_NOTIFICATIONS_ENABLED: string, IN_APP_NOTIFICATIONS_ENABLED: string, NOTIFICATION_ANIMATION_MODE: string}>}
+ * @type {Readonly<{AUTO_POLLING_ENABLED: string, POLLING_INTERVAL_SECONDS: string, AUTO_MARK_READ_ENABLED: string, AUTO_MARK_READ_DELAY: string, OS_NOTIFICATIONS_ENABLED: string, IN_APP_NOTIFICATIONS_ENABLED: string, NOTIFICATION_ANIMATION_MODE: string, EMAIL_COMPOSITION_FORMAT: string, EMAIL_FONT_FAMILY: string, EMAIL_FONT_SIZE: string, AUTO_SIGNATURE_ENABLED: string, EMAIL_SIGNATURE: string, REPLY_QUOTE_POSITION: string, INCLUDE_ORIGINAL_MESSAGE: string}>}
  */
 export const SETTING_KEYS = /** @type {const} */ ({
   AUTO_POLLING_ENABLED: 'autoPollingEnabled',
@@ -40,7 +54,14 @@ export const SETTING_KEYS = /** @type {const} */ ({
   AUTO_MARK_READ_DELAY: 'autoMarkReadDelay',
   OS_NOTIFICATIONS_ENABLED: 'osNotificationsEnabled',
   IN_APP_NOTIFICATIONS_ENABLED: 'inAppNotificationsEnabled',
-  NOTIFICATION_ANIMATION_MODE: 'notificationAnimationMode'
+  NOTIFICATION_ANIMATION_MODE: 'notificationAnimationMode',
+  EMAIL_COMPOSITION_FORMAT: 'emailCompositionFormat',
+  EMAIL_FONT_FAMILY: 'emailFontFamily',
+  EMAIL_FONT_SIZE: 'emailFontSize',
+  AUTO_SIGNATURE_ENABLED: 'autoSignatureEnabled',
+  EMAIL_SIGNATURE: 'emailSignature',
+  REPLY_QUOTE_POSITION: 'replyQuotePosition',
+  INCLUDE_ORIGINAL_MESSAGE: 'includeOriginalMessage'
 });
 
 /**

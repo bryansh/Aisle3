@@ -63,7 +63,14 @@ describe('settingsManager', () => {
         autoMarkReadDelay: 1500,
         osNotificationsEnabled: true,
         inAppNotificationsEnabled: true,
-        notificationAnimationMode: 'default'
+        notificationAnimationMode: 'default',
+        emailCompositionFormat: 'html',
+        emailFontFamily: 'Arial, sans-serif',
+        emailFontSize: '14px',
+        autoSignatureEnabled: false,
+        emailSignature: '',
+        replyQuotePosition: 'below',
+        includeOriginalMessage: true
       });
     });
   });
@@ -77,7 +84,14 @@ describe('settingsManager', () => {
         AUTO_MARK_READ_DELAY: 'autoMarkReadDelay',
         OS_NOTIFICATIONS_ENABLED: 'osNotificationsEnabled',
         IN_APP_NOTIFICATIONS_ENABLED: 'inAppNotificationsEnabled',
-        NOTIFICATION_ANIMATION_MODE: 'notificationAnimationMode'
+        NOTIFICATION_ANIMATION_MODE: 'notificationAnimationMode',
+        EMAIL_COMPOSITION_FORMAT: 'emailCompositionFormat',
+        EMAIL_FONT_FAMILY: 'emailFontFamily',
+        EMAIL_FONT_SIZE: 'emailFontSize',
+        AUTO_SIGNATURE_ENABLED: 'autoSignatureEnabled',
+        EMAIL_SIGNATURE: 'emailSignature',
+        REPLY_QUOTE_POSITION: 'replyQuotePosition',
+        INCLUDE_ORIGINAL_MESSAGE: 'includeOriginalMessage'
       });
     });
   });
@@ -103,7 +117,14 @@ describe('settingsManager', () => {
         autoMarkReadDelay: 3000,
         osNotificationsEnabled: true,
         inAppNotificationsEnabled: true,
-        notificationAnimationMode: 'default'
+        notificationAnimationMode: 'default',
+        emailCompositionFormat: 'html',
+        emailFontFamily: 'Arial, sans-serif',
+        emailFontSize: '14px',
+        autoSignatureEnabled: false,
+        emailSignature: '',
+        replyQuotePosition: 'below',
+        includeOriginalMessage: true
       });
     });
 
