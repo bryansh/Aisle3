@@ -3,6 +3,18 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
 import EmailApp from '../../lib/components/EmailApp.svelte';
 import { mockEmails, mockConversations, resetMocks } from '../__mocks__/tauri.js';
 
+// Mock Tauri Store plugin
+vi.mock('@tauri-apps/plugin-store', () => ({
+  Store: {
+    load: vi.fn().mockResolvedValue({
+      get: vi.fn(),
+      set: vi.fn(),
+      delete: vi.fn(),
+      save: vi.fn()
+    })
+  }
+}));
+
 // Mock Tauri at the global level
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn()
@@ -25,7 +37,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { emailService } from '../../lib/services/emailService.js';
 
 describe('Email App Integration', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     resetMocks();
     vi.clearAllMocks();
     
@@ -38,6 +50,15 @@ describe('Email App Integration', () => {
         clear: vi.fn()
       },
       writable: true
+    });
+
+    // Reset Tauri Store mocks - we'll set up fresh mocks for each test
+    const { Store } = await import('@tauri-apps/plugin-store');
+    Store.load.mockResolvedValue({
+      get: vi.fn().mockResolvedValue(null),
+      set: vi.fn().mockResolvedValue(undefined),
+      save: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined)
     });
 
     // Set up default mocks
@@ -267,10 +288,26 @@ describe('Email App Integration', () => {
       vi.useRealTimers();
     });
 
-    it('initializes with auto-polling configuration', async () => {
+    it('initializes with settings storage configuration', async () => {
       invoke.mockResolvedValue(false);
       emailService.loadEmails.mockResolvedValue([]);
       emailService.loadStats.mockResolvedValue({ totalCount: 0, unreadCount: 0 });
+
+      const { container } = render(EmailApp);
+      
+      // Component should initialize with settings manager
+      expect(container).toBeDefined();
+      expect(container.querySelector('main')).toBeInTheDocument();
+    });
+
+    it('falls back to localStorage when Tauri Store fails', async () => {
+      invoke.mockResolvedValue(false);
+      emailService.loadEmails.mockResolvedValue([]);
+      emailService.loadStats.mockResolvedValue({ totalCount: 0, unreadCount: 0 });
+      
+      // Mock Store.load to throw error (simulating unavailability)
+      const { Store } = await import('@tauri-apps/plugin-store');
+      Store.load.mockRejectedValueOnce(new Error('Tauri Store not available'));
       
       // Mock localStorage settings
       window.localStorage.getItem.mockImplementation((key) => {
@@ -281,9 +318,13 @@ describe('Email App Integration', () => {
 
       const { container } = render(EmailApp);
       
-      // Component should initialize with polling settings
+      // Component should initialize and fallback to localStorage
       expect(container).toBeDefined();
-      expect(window.localStorage.getItem).toHaveBeenCalled();
+      
+      // Wait for fallback to localStorage
+      await waitFor(() => {
+        expect(window.localStorage.getItem).toHaveBeenCalled();
+      });
     });
   });
 

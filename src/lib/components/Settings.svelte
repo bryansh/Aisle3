@@ -10,6 +10,7 @@
     osNotificationsEnabled: boolean;
     inAppNotificationsEnabled: boolean;
     notificationAnimationMode: 'default' | 'quick';
+    isUsingTauriStore?: boolean;
     onToggleAutoPolling: () => void;
     onIntervalChanged: () => void;
     onToggleAutoMarkRead: () => void;
@@ -26,6 +27,7 @@
     osNotificationsEnabled = $bindable(),
     inAppNotificationsEnabled = $bindable(),
     notificationAnimationMode = $bindable(),
+    isUsingTauriStore = false,
     onToggleAutoPolling,
     onIntervalChanged,
     onToggleAutoMarkRead,
@@ -112,6 +114,11 @@
 <div class="space-y-6">
   <div>
     <h2 class="text-xl font-semibold text-gray-800 mb-4">⚙️ Settings</h2>
+    {#if isUsingTauriStore}
+      <p class="text-xs text-green-600 mb-2">✅ Using Tauri Store (persistent storage)</p>
+    {:else}
+      <p class="text-xs text-yellow-600 mb-2">⚠️ Using browser localStorage (may be cleared)</p>
+    {/if}
   </div>
 
   <!-- App Updates Settings -->

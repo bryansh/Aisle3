@@ -18,6 +18,7 @@
   
   // Import utility modules
   import { SettingsManager } from '../utils/settingsManager.js';
+  import { createTauriSettingsManager } from '../utils/settingsStore.js';
   import { AuthManager, initializeAuth, handleAuthSuccess as handleAuthSuccessUtil } from '../utils/authManager.js';
   import { createEmailPollingManager } from '../utils/pollingManager.js';
   import { createEmailNotificationManager } from '../utils/emailNotificationManager.js';
@@ -44,7 +45,8 @@
   } from '../stores/emailStore.js';
 
   // Initialize utility managers
-  const settingsManager = new SettingsManager();
+  let settingsManager: any = null;
+  let isUsingTauriStore = $state(false);
   let authManager: AuthManager;
   let pollingManager: any;
   let emailNotificationManager: any;
@@ -66,14 +68,14 @@
   let inAppNotificationTitle = $state('');
   let inAppNotificationMessage = $state('');
   
-  // Settings state (bound to settingsManager)
-  let autoPollingEnabled = $state(settingsManager.getSetting('autoPollingEnabled'));
-  let pollingIntervalSeconds = $state(settingsManager.getSetting('pollingIntervalSeconds'));
-  let autoMarkReadEnabled = $state(settingsManager.getSetting('autoMarkReadEnabled'));
-  let autoMarkReadDelay = $state(settingsManager.getSetting('autoMarkReadDelay'));
-  let osNotificationsEnabled = $state(settingsManager.getSetting('osNotificationsEnabled') ?? true);
-  let inAppNotificationsEnabled = $state(settingsManager.getSetting('inAppNotificationsEnabled') ?? true);
-  let notificationAnimationMode = $state(settingsManager.getSetting('notificationAnimationMode') ?? 'default');
+  // Settings state (initialized with defaults, will be loaded from store)
+  let autoPollingEnabled = $state(false);
+  let pollingIntervalSeconds = $state(30);
+  let autoMarkReadEnabled = $state(true);
+  let autoMarkReadDelay = $state(1500);
+  let osNotificationsEnabled = $state(true);
+  let inAppNotificationsEnabled = $state(true);
+  let notificationAnimationMode = $state<'default' | 'quick'>('default');
 
   // Load settings from settingsManager
   const loadSettings = () => {
@@ -88,16 +90,28 @@
   };
 
   // Save settings via settingsManager
-  const saveSettings = () => {
-    settingsManager.updateSettings({
-      autoPollingEnabled,
-      pollingIntervalSeconds,
-      autoMarkReadEnabled,
-      autoMarkReadDelay,
-      osNotificationsEnabled,
-      inAppNotificationsEnabled,
-      notificationAnimationMode
-    });
+  const saveSettings = async () => {
+    if (isUsingTauriStore) {
+      await settingsManager.updateSettings({
+        autoPollingEnabled,
+        pollingIntervalSeconds,
+        autoMarkReadEnabled,
+        autoMarkReadDelay,
+        osNotificationsEnabled,
+        inAppNotificationsEnabled,
+        notificationAnimationMode
+      });
+    } else {
+      settingsManager.updateSettings({
+        autoPollingEnabled,
+        pollingIntervalSeconds,
+        autoMarkReadEnabled,
+        autoMarkReadDelay,
+        osNotificationsEnabled,
+        inAppNotificationsEnabled,
+        notificationAnimationMode
+      });
+    }
   };
 
   // Check authentication status on mount
@@ -108,6 +122,18 @@
     
     const initializeApp = async () => {
       try {
+        // Initialize settings manager - try Tauri Store first
+        try {
+          settingsManager = await createTauriSettingsManager();
+          isUsingTauriStore = true;
+          console.log('✅ Using Tauri Store for settings');
+        } catch (e) {
+          // Fallback to localStorage if Tauri Store fails (e.g., in dev/browser)
+          console.log('⚠️ Tauri Store not available, using localStorage');
+          settingsManager = new SettingsManager();
+          isUsingTauriStore = false;
+        }
+        
         // Load settings from settingsManager
         loadSettings();
         
@@ -382,16 +408,16 @@
   };
 
   // Settings event handlers
-  const handleToggleAutoPolling = () => {
+  const handleToggleAutoPolling = async () => {
     if (autoPollingEnabled) {
       startAutoPolling();
     } else {
       stopAutoPolling();
     }
-    saveSettings();
+    await saveSettings();
   };
 
-  const handleIntervalChanged = () => {
+  const handleIntervalChanged = async () => {
     console.log(`🔄 Polling interval changed to ${pollingIntervalSeconds} seconds`);
     
     // Update both managers
@@ -403,7 +429,7 @@
         pollingIntervalSeconds: pollingIntervalSeconds
       });
     }
-    saveSettings();
+    await saveSettings();
   };
 
   const handleCheckNow = async () => {
@@ -432,16 +458,16 @@
   };
 
   // Auto-mark read settings handlers
-  const handleToggleAutoMarkRead = () => {
-    saveSettings();
+  const handleToggleAutoMarkRead = async () => {
+    await saveSettings();
   };
 
-  const handleAutoMarkReadDelayChanged = () => {
-    saveSettings();
+  const handleAutoMarkReadDelayChanged = async () => {
+    await saveSettings();
   };
 
-  const handleNotificationSettingsChanged = () => {
-    saveSettings();
+  const handleNotificationSettingsChanged = async () => {
+    await saveSettings();
     
     // Update the notification manager with new settings
     if (emailNotificationManager) {
@@ -555,6 +581,7 @@
           bind:osNotificationsEnabled
           bind:inAppNotificationsEnabled
           bind:notificationAnimationMode
+          isUsingTauriStore={isUsingTauriStore}
           onToggleAutoPolling={handleToggleAutoPolling}
           onIntervalChanged={handleIntervalChanged}
           onToggleAutoMarkRead={handleToggleAutoMarkRead}
