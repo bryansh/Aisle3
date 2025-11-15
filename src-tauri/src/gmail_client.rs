@@ -64,6 +64,23 @@ pub struct GmailProfile {
     pub threads_total: Option<u32>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GmailLabel {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "type")]
+    pub label_type: Option<String>,
+    #[serde(rename = "messageListVisibility")]
+    pub message_list_visibility: Option<String>,
+    #[serde(rename = "labelListVisibility")]
+    pub label_list_visibility: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GmailLabelsResponse {
+    pub labels: Option<Vec<GmailLabel>>,
+}
+
 pub struct GmailClient {
     client: Client,
     access_token: String,
@@ -95,6 +112,26 @@ impl GmailClient {
 
         let profile: GmailProfile = response.json().await?;
         Ok(profile)
+    }
+
+    pub async fn get_labels(
+        &self,
+    ) -> Result<Vec<GmailLabel>, Box<dyn std::error::Error + Send + Sync>> {
+        let url = "https://gmail.googleapis.com/gmail/v1/users/me/labels";
+
+        let response = self
+            .client
+            .get(url)
+            .bearer_auth(&self.access_token)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            return Err(format!("Gmail API error: {}", response.status()).into());
+        }
+
+        let labels_response: GmailLabelsResponse = response.json().await?;
+        Ok(labels_response.labels.unwrap_or_default())
     }
 
     pub async fn list_messages(

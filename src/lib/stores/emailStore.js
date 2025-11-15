@@ -8,6 +8,12 @@ export const emails = writable([]);
 export const totalCount = writable(0);
 export const unreadCount = writable(0);
 
+// Label state
+/** @type {import('svelte/store').Writable<any[]>} */
+export const availableLabels = writable([]);
+/** @type {import('svelte/store').Writable<string[]>} */
+export const selectedLabelFilters = writable([]);
+
 // Loading states using shared utilities
 export const loading = useLoadingState(LOADING_KEYS.EMAIL_LIST);
 export const loadingEmail = useLoadingState(LOADING_KEYS.EMAIL_CONTENT);
@@ -26,24 +32,42 @@ export const showEmailView = writable(false);
 export const showSettings = writable(false);
 
 // Derived stores
+// Filtered emails based on selected labels
+export const filteredEmails = derived(
+  [emails, selectedLabelFilters],
+  ([$emails, $selectedLabelFilters]) => {
+    if (!$selectedLabelFilters || $selectedLabelFilters.length === 0) {
+      return $emails;
+    }
+
+    return $emails.filter(email => {
+      if (!email.label_ids) return false;
+      // Email must have ALL selected labels
+      return $selectedLabelFilters.every(labelId =>
+        email.label_ids.includes(labelId)
+      );
+    });
+  }
+);
+
 export const conversations = derived(
-  [emails, viewMode, showSingleMessageThreads],
-  ([$emails, $viewMode, $showSingleMessageThreads]) => {
+  [filteredEmails, viewMode, showSingleMessageThreads],
+  ([$filteredEmails, $viewMode, $showSingleMessageThreads]) => {
     if ($viewMode !== 'conversations') return [];
-    
-    // Update emailService cache
-    emailService.emails = $emails;
+
+    // Update emailService cache with filtered emails
+    emailService.emails = $filteredEmails;
     return emailService.getConversations($showSingleMessageThreads);
   }
 );
 
 export const conversationStats = derived(
-  [emails, viewMode],
-  ([$emails, $viewMode]) => {
+  [filteredEmails, viewMode],
+  ([$filteredEmails, $viewMode]) => {
     if ($viewMode !== 'conversations') return null;
-    
-    // Update emailService cache
-    emailService.emails = $emails;
+
+    // Update emailService cache with filtered emails
+    emailService.emails = $filteredEmails;
     return emailService.getConversationStats();
   }
 );
@@ -210,10 +234,10 @@ export const emailOperations = {
   async checkForNewEmails(useBackgroundLoading = false) {
     try {
       const result = await emailService.checkForNewEmails(useBackgroundLoading);
-      
+
       // Handle both old format (array) and new format (object with emailIds and emailDetails)
       const newEmailIds = Array.isArray(result) ? result : (result && result.emailIds ? result.emailIds : []);
-      
+
       if (newEmailIds.length > 0) {
         // Update stores with new data
         emails.set(emailService.getEmails());
@@ -221,12 +245,37 @@ export const emailOperations = {
         totalCount.set(stats.totalCount);
         unreadCount.set(stats.unreadCount);
       }
-      
+
       return result; // Return the original result format for compatibility
     } catch (error) {
       console.error('Error checking for new emails:', error);
       throw error;
     }
+  },
+
+  async loadLabels() {
+    try {
+      const labels = await emailService.loadLabels();
+      availableLabels.set(labels);
+      return labels;
+    } catch (error) {
+      console.error('Error loading labels:', error);
+      throw error;
+    }
+  },
+
+  toggleLabelFilter(labelId) {
+    selectedLabelFilters.update(filters => {
+      if (filters.includes(labelId)) {
+        return filters.filter(id => id !== labelId);
+      } else {
+        return [...filters, labelId];
+      }
+    });
+  },
+
+  clearLabelFilters() {
+    selectedLabelFilters.set([]);
   }
 };
 

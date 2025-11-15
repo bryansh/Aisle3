@@ -32,6 +32,7 @@ struct Email {
     sender: String,
     snippet: String,
     is_read: bool,
+    label_ids: Option<Vec<String>>,
 }
 
 #[tauri::command]
@@ -102,6 +103,7 @@ async fn get_emails(state: State<'_, AppState>) -> Result<Vec<Email>, String> {
                     sender: format!("sender{}@example.com", i),
                     snippet: "This is a preview of the email content...".to_string(),
                     is_read: i % 2 == 0,
+                    label_ids: Some(vec!["INBOX".to_string(), "UNREAD".to_string()]),
                 });
             }
             return Ok(emails);
@@ -111,9 +113,9 @@ async fn get_emails(state: State<'_, AppState>) -> Result<Vec<Email>, String> {
     // Create Gmail client and fetch real emails using the refreshed tokens
     let gmail_client = GmailClient::new(&tokens);
 
-    // List messages (get first 20)
+    // List messages (get first 100 for better label coverage)
     let response = gmail_client
-        .list_messages(Some(20), None, None)
+        .list_messages(Some(100), None, None)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -149,6 +151,7 @@ async fn get_emails(state: State<'_, AppState>) -> Result<Vec<Email>, String> {
                 sender: msg.get_from(),
                 snippet: msg.snippet.clone(),
                 is_read: !msg.is_unread(),
+                label_ids: msg.label_ids.clone(),
             }
         })
         .collect();
@@ -182,6 +185,36 @@ async fn get_inbox_stats(state: State<'_, AppState>) -> Result<(u32, u32), Strin
                 }
                 Err(_) => Ok((total, 0)),
             }
+        }
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[tauri::command]
+async fn get_labels(state: State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
+    // This will either return valid tokens or an error
+    let tokens = match refresh_tokens_if_needed(&state).await {
+        Ok(tokens) => tokens,
+        Err(_) => return Ok(Vec::new()), // Return empty list if not authenticated
+    };
+
+    // Create Gmail client and fetch labels
+    let gmail_client = GmailClient::new(&tokens);
+
+    match gmail_client.get_labels().await {
+        Ok(labels) => {
+            // Convert labels to JSON for easier frontend handling
+            let json_labels: Vec<serde_json::Value> = labels
+                .into_iter()
+                .map(|label| {
+                    serde_json::json!({
+                        "id": label.id,
+                        "name": label.name,
+                        "type": label.label_type,
+                    })
+                })
+                .collect();
+            Ok(json_labels)
         }
         Err(e) => Err(e.to_string()),
     }
@@ -545,6 +578,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             get_emails,
             get_inbox_stats,
+            get_labels,
             check_for_updates,
             install_update,
             start_gmail_auth,

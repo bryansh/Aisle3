@@ -336,6 +336,19 @@ export class EmailService {
       singleMessageThreads
     };
   }
+
+  /**
+   * Load available Gmail labels
+   */
+  async loadLabels() {
+    try {
+      const labels = await invoke('get_labels');
+      return labels;
+    } catch (error) {
+      console.error('Error loading labels:', error);
+      throw error;
+    }
+  }
 }
 
 // Export singleton instance

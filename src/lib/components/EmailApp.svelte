@@ -11,6 +11,7 @@
   import ConversationViewer from './ConversationViewer.svelte';
   import UpdateNotification from './UpdateNotification.svelte';
   import InAppNotification from './InAppNotification.svelte';
+  import LabelFilter from './LabelFilter.svelte';
   import DOMPurify from 'dompurify';
   import { decode } from 'he';
   import { performanceSuite } from '../utils/performance.js';
@@ -27,6 +28,7 @@
   // Import stores
   import {
     emails,
+    filteredEmails,
     totalCount,
     unreadCount,
     loading,
@@ -40,6 +42,8 @@
     loadingEmailStates,
     conversations,
     conversationStats,
+    availableLabels,
+    selectedLabelFilters,
     emailOperations,
     navigationOperations
   } from '../stores/emailStore.js';
@@ -178,12 +182,19 @@
           
           // Initialize polling and notification managers if authenticated
           if (isAuthenticated) {
+            // Load Gmail labels
+            try {
+              await emailOperations.loadLabels();
+            } catch (error) {
+              console.error('Error loading labels:', error);
+            }
+
             // Keep existing polling manager for manual checks
             pollingManager = createEmailPollingManager(emailOperations, {
               intervalSeconds: pollingIntervalSeconds,
               enabled: false // Disable auto-polling, let notification manager handle it
             });
-            
+
             // Initialize email notification manager for auto-polling and notifications
             emailNotificationManager = await createEmailNotificationManager(emailOperations, {
               enabled: true,
@@ -193,14 +204,14 @@
               pollingIntervalSeconds: pollingIntervalSeconds,
               notificationCooldownMinutes: 1 // 1 minute between notifications
             });
-            
+
             // Set up in-app notification listener only if in-app notifications are enabled
             if (inAppNotificationsEnabled) {
               emailNotificationManager.addInAppNotificationListener((notification: any) => {
                 handleInAppNotification(notification);
               });
             }
-            
+
             if (autoPollingEnabled) {
               emailNotificationManager.start();
             }
@@ -275,12 +286,19 @@
     if (authManager) {
       const result = await handleAuthSuccessUtil(authManager, emailOperations);
       if (result.success) {
+        // Load Gmail labels
+        try {
+          await emailOperations.loadLabels();
+        } catch (error) {
+          console.error('Error loading labels:', error);
+        }
+
         // Initialize polling manager for manual checks
         pollingManager = createEmailPollingManager(emailOperations, {
           intervalSeconds: pollingIntervalSeconds,
           enabled: false
         });
-        
+
         // Initialize email notification manager for auto-polling and notifications
         emailNotificationManager = await createEmailNotificationManager(emailOperations, {
           enabled: true,
@@ -290,14 +308,14 @@
           pollingIntervalSeconds: pollingIntervalSeconds,
           notificationCooldownMinutes: 1 // 1 minute between notifications
         });
-        
+
         // Set up in-app notification listener only if in-app notifications are enabled
         if (inAppNotificationsEnabled) {
           emailNotificationManager.addInAppNotificationListener((notification: any) => {
             handleInAppNotification(notification);
           });
         }
-        
+
         if (autoPollingEnabled) {
           emailNotificationManager.start();
         }
@@ -612,7 +630,7 @@
           />
         {/if}
       {:else if $showSettings}
-        <Settings 
+        <Settings
           bind:autoPollingEnabled
           bind:pollingInterval={pollingIntervalSeconds}
           bind:autoMarkReadEnabled
@@ -639,7 +657,18 @@
       {:else}
         {#if $loading}
           <LoadingSpinner />
-        {:else if $viewMode === 'conversations'}
+        {:else}
+          <!-- Label Filter -->
+          {#if !isDemoMode && $availableLabels.length > 0}
+            <LabelFilter
+              availableLabels={$availableLabels}
+              selectedFilters={$selectedLabelFilters}
+              onToggleFilter={emailOperations.toggleLabelFilter}
+              onClearFilters={emailOperations.clearLabelFilters}
+            />
+          {/if}
+
+          {#if $viewMode === 'conversations'}
           {#if $conversationStats && $conversationStats.multiMessageThreads === 0}
             <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
               <div class="flex items-center justify-between">
@@ -664,22 +693,23 @@
             </div>
           {/if}
           
-          <ConversationList 
-            conversations={$conversations}
-            onConversationSelect={handleConversationSelect}
-          />
-        {:else}
-          <EmailListVirtualized 
-            emails={$emails}
-            onEmailSelect={handleEmailSelect}
-            onMarkAsRead={handleMarkAsRead}
-            onMarkAsUnread={handleMarkAsUnread}
-            loadingEmailStates={loadingEmailStates}
-            containerHeight={600}
-            itemHeight={120}
-            useVirtualization={true}
-            virtualizationThreshold={50}
-          />
+            <ConversationList
+              conversations={$conversations}
+              onConversationSelect={handleConversationSelect}
+            />
+          {:else}
+            <EmailListVirtualized
+              emails={$filteredEmails}
+              onEmailSelect={handleEmailSelect}
+              onMarkAsRead={handleMarkAsRead}
+              onMarkAsUnread={handleMarkAsUnread}
+              loadingEmailStates={loadingEmailStates}
+              containerHeight={600}
+              itemHeight={120}
+              useVirtualization={true}
+              virtualizationThreshold={50}
+            />
+          {/if}
         {/if}
       {/if}
     {:else}
