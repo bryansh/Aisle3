@@ -32,42 +32,31 @@ export const showEmailView = writable(false);
 export const showSettings = writable(false);
 
 // Derived stores
-// Filtered emails based on selected labels
+// Since we're doing server-side filtering, filteredEmails is just an alias for emails
+// Keeping it for backward compatibility with existing components
 export const filteredEmails = derived(
-  [emails, selectedLabelFilters],
-  ([$emails, $selectedLabelFilters]) => {
-    if (!$selectedLabelFilters || $selectedLabelFilters.length === 0) {
-      return $emails;
-    }
-
-    return $emails.filter(email => {
-      if (!email.label_ids) return false;
-      // Email must have ALL selected labels
-      return $selectedLabelFilters.every(labelId =>
-        email.label_ids.includes(labelId)
-      );
-    });
-  }
+  [emails],
+  ([$emails]) => $emails
 );
 
 export const conversations = derived(
-  [filteredEmails, viewMode, showSingleMessageThreads],
-  ([$filteredEmails, $viewMode, $showSingleMessageThreads]) => {
+  [emails, viewMode, showSingleMessageThreads],
+  ([$emails, $viewMode, $showSingleMessageThreads]) => {
     if ($viewMode !== 'conversations') return [];
 
-    // Update emailService cache with filtered emails
-    emailService.emails = $filteredEmails;
+    // Update emailService cache
+    emailService.emails = $emails;
     return emailService.getConversations($showSingleMessageThreads);
   }
 );
 
 export const conversationStats = derived(
-  [filteredEmails, viewMode],
-  ([$filteredEmails, $viewMode]) => {
+  [emails, viewMode],
+  ([$emails, $viewMode]) => {
     if ($viewMode !== 'conversations') return null;
 
-    // Update emailService cache with filtered emails
-    emailService.emails = $filteredEmails;
+    // Update emailService cache
+    emailService.emails = $emails;
     return emailService.getConversationStats();
   }
 );
@@ -76,20 +65,54 @@ export const conversationStats = derived(
 const loadEmailsWithLoading = createAsyncOperation(loading);
 const loadEmailContentWithLoading = createAsyncOperation(loadingEmail);
 
+// Cache for label queries to avoid redundant API calls
+const emailCache = new Map();
+
+// Helper to build Gmail query from selected labels
+function buildLabelQuery(labelIds, labels) {
+  if (!labelIds || labelIds.length === 0) return null;
+
+  // Convert label IDs to names for the query
+  // For system labels (INBOX, SENT, etc.), use the ID as-is
+  // For custom labels, we need to use the actual name
+  return labelIds.map(id => {
+    const label = labels.find(l => l.id === id);
+    const labelName = label ? label.name : id;
+
+    // If label name has spaces, wrap in quotes
+    if (labelName.includes(' ')) {
+      return `label:"${labelName}"`;
+    }
+    return `label:${labelName}`;
+  }).join(' ');
+}
+
 // Email operations
 export const emailOperations = {
-  async loadEmails() {
+  async loadEmails(query) {
     return loadEmailsWithLoading(async () => {
-      const emailData = await emailService.loadEmails();
+      console.log('📧 loadEmails called with query:', query);
+      const emailData = await emailService.loadEmails(query);
+      console.log('📧 Received emails:', emailData.length, 'emails');
       emails.set(emailData);
+
+      // Cache the results
+      const cacheKey = query || 'default';
+      emailCache.set(cacheKey, emailData);
+
       return emailData;
     });
   },
 
-  async loadEmailsInBackground() {
+  async loadEmailsInBackground(query) {
     try {
-      const emailData = await emailService.loadEmailsInBackground();
+      const emailData = await emailService.loadEmailsInBackground(query);
       emails.set(emailData);
+
+      // Cache the results
+      const cacheKey = query || 'default';
+      emailCache.set(cacheKey, emailData);
+
       return emailData;
     } catch (error) {
       console.error('Error loading emails in background:', error);
@@ -264,18 +287,54 @@ export const emailOperations = {
     }
   },
 
-  toggleLabelFilter(labelId) {
+  async toggleLabelFilter(labelId) {
+    console.log('🏷️ toggleLabelFilter called with:', labelId);
+
+    // Update the selected filters
+    let newFilters;
     selectedLabelFilters.update(filters => {
       if (filters.includes(labelId)) {
-        return filters.filter(id => id !== labelId);
+        newFilters = filters.filter(id => id !== labelId);
       } else {
-        return [...filters, labelId];
+        newFilters = [...filters, labelId];
       }
+      console.log('🏷️ Updated filters:', newFilters);
+      return newFilters;
     });
+
+    // Get current labels to build proper query
+    let currentLabels;
+    availableLabels.subscribe(labels => {
+      currentLabels = labels;
+    })();
+
+    // Build query and fetch emails from server
+    const query = buildLabelQuery(newFilters, currentLabels);
+    console.log('🔍 Built query:', query);
+
+    // Check cache first
+    const cacheKey = query || 'default';
+    if (emailCache.has(cacheKey)) {
+      console.log('📦 Using cached emails for:', cacheKey);
+      emails.set(emailCache.get(cacheKey));
+    } else {
+      console.log('🔍 Fetching emails for query:', query || '(all emails)');
+      await this.loadEmails(query);
+    }
   },
 
-  clearLabelFilters() {
+  async clearLabelFilters() {
     selectedLabelFilters.set([]);
+
+    // Load all emails (no filter)
+    const cacheKey = 'default';
+    if (emailCache.has(cacheKey)) {
+      console.log('📦 Using cached emails (no filters)');
+      emails.set(emailCache.get(cacheKey));
+    } else {
+      console.log('🔍 Fetching all emails');
+      await this.loadEmails(null);
+    }
   }
 };
 

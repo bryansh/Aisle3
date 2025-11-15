@@ -663,8 +663,8 @@
             <LabelFilter
               availableLabels={$availableLabels}
               selectedFilters={$selectedLabelFilters}
-              onToggleFilter={emailOperations.toggleLabelFilter}
-              onClearFilters={emailOperations.clearLabelFilters}
+              onToggleFilter={(labelId) => emailOperations.toggleLabelFilter(labelId)}
+              onClearFilters={() => emailOperations.clearLabelFilters()}
             />
           {/if}
 

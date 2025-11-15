@@ -48,12 +48,22 @@
     isExpanded = !isExpanded;
   }
 
-  function handleToggleFilter(labelId: string) {
-    onToggleFilter(labelId);
+  async function handleToggleFilter(labelId: string) {
+    console.log('🏷️ Label clicked:', labelId);
+    try {
+      await onToggleFilter(labelId);
+    } catch (error) {
+      console.error('Error toggling filter:', error);
+    }
   }
 
-  function handleClearAll() {
-    onClearFilters();
+  async function handleClearAll() {
+    console.log('🧹 Clearing all filters');
+    try {
+      await onClearFilters();
+    } catch (error) {
+      console.error('Error clearing filters:', error);
+    }
   }
 </script>
 

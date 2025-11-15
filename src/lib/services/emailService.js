@@ -14,10 +14,11 @@ export class EmailService {
 
   /**
    * Load emails from Gmail API
+   * @param {string} [query] - Optional Gmail query string (e.g., "label:Work")
    */
-  async loadEmails() {
+  async loadEmails(query) {
     try {
-      const emails = await invoke('get_emails');
+      const emails = await invoke('get_emails', { query: query || null });
       this.emails = emails;
       return emails;
     } catch (error) {
@@ -28,10 +29,11 @@ export class EmailService {
 
   /**
    * Load emails in background (no loading spinner)
+   * @param {string} [query] - Optional Gmail query string (e.g., "label:Work")
    */
-  async loadEmailsInBackground() {
+  async loadEmailsInBackground(query) {
     try {
-      const emails = await invoke('get_emails');
+      const emails = await invoke('get_emails', { query: query || null });
       this.emails = emails;
       return emails;
     } catch (error) {

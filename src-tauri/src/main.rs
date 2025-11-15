@@ -86,7 +86,7 @@ async fn install_update(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn get_emails(state: State<'_, AppState>) -> Result<Vec<Email>, String> {
+async fn get_emails(state: State<'_, AppState>, query: Option<String>) -> Result<Vec<Email>, String> {
     // Check rate limit
     state.rate_limiter.check_rate_limit("get_emails")?;
     // This will either return valid tokens or an error
@@ -115,7 +115,7 @@ async fn get_emails(state: State<'_, AppState>) -> Result<Vec<Email>, String> {
 
     // List messages (get first 100 for better label coverage)
     let response = gmail_client
-        .list_messages(Some(100), None, None)
+        .list_messages(Some(100), None, query.as_deref())
         .await
         .map_err(|e| e.to_string())?;
 
