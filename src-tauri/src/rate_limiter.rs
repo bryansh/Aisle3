@@ -34,6 +34,8 @@ impl RateLimiter {
                 "send_reply" => RateLimit::new(10, Duration::from_secs(60)), // 10 replies per minute
                 "mark_email_as_read" => RateLimit::new(20, Duration::from_secs(60)), // 20 marks per minute
                 "mark_email_as_unread" => RateLimit::new(20, Duration::from_secs(60)), // 20 marks per minute
+                "trash_emails" => RateLimit::new(10, Duration::from_secs(60)), // 10 trash operations per minute
+                "get_sender_stats" => RateLimit::new(5, Duration::from_secs(60)), // 5 stats requests per minute (expensive operation)
                 "get_inbox_stats" => RateLimit::new(20, Duration::from_secs(60)), // 20 stats per minute
                 "check_for_new_emails_since_last_check" => {
                     RateLimit::new(30, Duration::from_secs(60))

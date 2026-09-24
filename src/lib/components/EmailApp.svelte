@@ -12,6 +12,7 @@
   import UpdateNotification from './UpdateNotification.svelte';
   import InAppNotification from './InAppNotification.svelte';
   import LabelFilter from './LabelFilter.svelte';
+  import InboxCleanup from './InboxCleanup.svelte';
   import DOMPurify from 'dompurify';
   import { decode } from 'he';
   import { performanceSuite } from '../utils/performance.js';
@@ -71,7 +72,11 @@
   let inAppNotificationType: 'email' | 'update' | 'info' | 'error' = $state('email');
   let inAppNotificationTitle = $state('');
   let inAppNotificationMessage = $state('');
-  
+
+  // Cleanup modal state
+  let showCleanupModal = $state(false);
+  let senderStats = $state<any[]>([]);
+
   // Settings state (initialized with defaults, will be loaded from store)
   let autoPollingEnabled = $state(false);
   let pollingIntervalSeconds = $state(30);
@@ -440,6 +445,54 @@
     return emailOperations.markAsUnread(emailId);
   };
 
+  // Cleanup modal handlers
+  const handleShowCleanup = async () => {
+    if (isDemoMode) {
+      showDemoMessage = true;
+      return;
+    }
+    // Get sender stats from ALL inbox emails (backend analysis)
+    try {
+      senderStats = await emailOperations.getSenderStats();
+      showCleanupModal = true;
+    } catch (error) {
+      console.error('Error loading sender stats:', error);
+      alert('Failed to load sender statistics. Please try again.');
+    }
+  };
+
+  const handleCloseCleanup = () => {
+    showCleanupModal = false;
+    senderStats = [];
+  };
+
+  const handleRefreshSenderStats = async () => {
+    try {
+      senderStats = await emailOperations.getSenderStats(undefined, true); // force refresh
+    } catch (error) {
+      console.error('Error refreshing sender stats:', error);
+      throw error;
+    }
+  };
+
+  const handleTrashSender = async (sender: any) => {
+    try {
+      const emailIds = sender.emails.map((e: any) => e.id);
+      await emailOperations.trashEmails(emailIds);
+
+      // Update sender stats to reflect deletion
+      senderStats = await emailOperations.getSenderStats();
+
+      // If no more emails from any sender, close modal
+      if (senderStats.length === 0) {
+        handleCloseCleanup();
+      }
+    } catch (error) {
+      console.error('Error trashing sender emails:', error);
+      throw error;
+    }
+  };
+
   // Auto-polling functions (delegated to emailNotificationManager)
   const startAutoPolling = () => {
     if (emailNotificationManager) {
@@ -590,7 +643,7 @@
         </div>
       {/if}
       
-      <Header 
+      <Header
         showEmailView={$showEmailView}
         showSettings={$showSettings}
         totalCount={$totalCount}
@@ -600,6 +653,7 @@
         onBackToInbox={navigationOperations.backToInbox}
         onShowSettings={navigationOperations.showSettingsView}
         onViewModeToggle={navigationOperations.toggleViewMode}
+        onShowCleanup={handleShowCleanup}
       />
 
       {#if $showEmailView && ($selectedEmail || $selectedConversation)}
@@ -779,6 +833,16 @@
     animationMode={notificationAnimationMode}
     onClose={handleDismissInAppNotification}
   />
+
+  <!-- Inbox Cleanup Modal -->
+  {#if showCleanupModal}
+    <InboxCleanup
+      senderStats={senderStats}
+      onTrashSender={handleTrashSender}
+      onRefresh={handleRefreshSenderStats}
+      onClose={handleCloseCleanup}
+    />
+  {/if}
 </main>
 
 <style>

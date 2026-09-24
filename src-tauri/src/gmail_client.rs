@@ -523,6 +523,176 @@ impl GmailClient {
 
         Ok(())
     }
+
+    /// Trash multiple emails by moving them to TRASH label
+    /// Gmail API doesn't support batch delete, so we use batch modify with TRASH label
+    pub async fn trash_emails(
+        &self,
+        message_ids: &[String],
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        if message_ids.is_empty() {
+            return Ok(());
+        }
+
+        // Gmail's batch API for modifying messages
+        // We'll use the batch endpoint to trash multiple messages at once
+        let boundary = "batch_boundary_trash";
+        let mut batch_body = String::new();
+
+        for (i, message_id) in message_ids.iter().enumerate() {
+            batch_body.push_str(&format!("--{}\r\n", boundary));
+            batch_body.push_str("Content-Type: application/http\r\n");
+            batch_body.push_str(&format!("Content-ID: <item{}>\r\n\r\n", i));
+            batch_body.push_str(&format!(
+                "POST /gmail/v1/users/me/messages/{}/trash HTTP/1.1\r\n",
+                message_id
+            ));
+            batch_body.push_str("Host: gmail.googleapis.com\r\n");
+            batch_body.push_str("Content-Length: 0\r\n\r\n");
+        }
+        batch_body.push_str(&format!("--{}--\r\n", boundary));
+
+        let url = "https://gmail.googleapis.com/batch/gmail/v1";
+        let response = self
+            .client
+            .post(url)
+            .bearer_auth(&self.access_token)
+            .header(
+                "Content-Type",
+                format!("multipart/mixed; boundary={}", boundary),
+            )
+            .body(batch_body)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await?;
+            return Err(format!("Gmail Batch Trash API error: {}", error_text).into());
+        }
+
+        Ok(())
+    }
+
+    /// Get sender statistics for all emails in inbox
+    /// Returns aggregated stats: sender, count, oldest/newest message IDs
+    pub async fn get_sender_stats(
+        &self,
+        query: Option<&str>,
+    ) -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error + Send + Sync>> {
+        use std::collections::HashMap;
+
+        let mut all_message_refs = Vec::new();
+        let mut page_token: Option<String> = None;
+
+        // Fetch all message IDs (just metadata, very efficient)
+        loop {
+            let response = self
+                .list_messages(Some(500), page_token.as_deref(), query)
+                .await?;
+
+            if let Some(messages) = response.messages {
+                all_message_refs.extend(messages);
+            }
+
+            if response.next_page_token.is_none() {
+                break;
+            }
+            page_token = response.next_page_token;
+        }
+
+        println!(
+            "📊 Analyzing {} messages for sender statistics...",
+            all_message_refs.len()
+        );
+
+        // Now fetch messages in batches to get sender info
+        // We'll process in chunks of 50 (smaller batches to avoid rate limits)
+        let mut sender_map: HashMap<String, SenderStats> = HashMap::new();
+        let mut batch_count = 0;
+
+        for chunk in all_message_refs.chunks(50) {
+            let message_ids: Vec<String> = chunk.iter().map(|m| m.id.clone()).collect();
+
+            // Add delay between batches to respect rate limits
+            if batch_count > 0 && batch_count % 5 == 0 {
+                println!("⏳ Pausing to respect rate limits...");
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+            }
+
+            let messages = self.get_messages_batch(&message_ids).await?;
+            batch_count += 1;
+
+            for msg in messages {
+                let sender = msg.get_from();
+                let subject = msg.get_subject();
+
+                let stats = sender_map.entry(sender.clone()).or_insert(SenderStats {
+                    sender: sender.clone(),
+                    count: 0,
+                    oldest_id: msg.id.clone(),
+                    newest_id: msg.id.clone(),
+                    sample_subject: subject.clone(),
+                    unread_count: 0,
+                });
+
+                stats.count += 1;
+
+                if msg.is_unread() {
+                    stats.unread_count += 1;
+                }
+
+                // Email IDs are chronological
+                if msg.id < stats.oldest_id {
+                    stats.oldest_id = msg.id.clone();
+                }
+                if msg.id > stats.newest_id {
+                    stats.newest_id = msg.id.clone();
+                    stats.sample_subject = subject;
+                }
+            }
+
+            println!(
+                "📊 Processed batch, total senders found: {}",
+                sender_map.len()
+            );
+        }
+
+        // Convert to sorted JSON array
+        let mut sender_stats: Vec<serde_json::Value> = sender_map
+            .into_iter()
+            .map(|(_, stats)| {
+                serde_json::json!({
+                    "sender": stats.sender,
+                    "count": stats.count,
+                    "unreadCount": stats.unread_count,
+                    "oldestId": stats.oldest_id,
+                    "newestId": stats.newest_id,
+                    "sampleSubject": stats.sample_subject,
+                })
+            })
+            .collect();
+
+        // Sort by count (descending)
+        sender_stats.sort_by(|a, b| {
+            let count_a = a["count"].as_u64().unwrap_or(0);
+            let count_b = b["count"].as_u64().unwrap_or(0);
+            count_b.cmp(&count_a)
+        });
+
+        println!("📊 Found {} unique senders", sender_stats.len());
+
+        Ok(sender_stats)
+    }
+}
+
+#[derive(Debug)]
+struct SenderStats {
+    sender: String,
+    count: u32,
+    unread_count: u32,
+    oldest_id: String,
+    newest_id: String,
+    sample_subject: String,
 }
 
 // Helper functions to extract email data

@@ -445,6 +445,48 @@ async fn mark_email_as_unread(
 }
 
 #[tauri::command]
+async fn trash_emails(
+    email_ids: Vec<String>,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    // Check rate limit
+    state.rate_limiter.check_rate_limit("trash_emails")?;
+
+    let tokens = match refresh_tokens_if_needed(&state).await {
+        Ok(tokens) => tokens,
+        Err(e) => return Err(format!("Authentication required: {}", e)),
+    };
+
+    let gmail_client = GmailClient::new(&tokens);
+
+    match gmail_client.trash_emails(&email_ids).await {
+        Ok(_) => Ok(format!("Successfully trashed {} emails", email_ids.len())),
+        Err(e) => Err(format!("Failed to trash emails: {}", e)),
+    }
+}
+
+#[tauri::command]
+async fn get_sender_stats(
+    query: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<serde_json::Value>, String> {
+    // Check rate limit
+    state.rate_limiter.check_rate_limit("get_sender_stats")?;
+
+    let tokens = match refresh_tokens_if_needed(&state).await {
+        Ok(tokens) => tokens,
+        Err(e) => return Err(format!("Authentication required: {}", e)),
+    };
+
+    let gmail_client = GmailClient::new(&tokens);
+
+    match gmail_client.get_sender_stats(query.as_deref()).await {
+        Ok(stats) => Ok(stats),
+        Err(e) => Err(format!("Failed to get sender stats: {}", e)),
+    }
+}
+
+#[tauri::command]
 async fn send_reply(
     original_email_id: String,
     reply_body: String,
@@ -565,10 +607,36 @@ fn main() {
     // Load saved tokens on startup
     let saved_tokens = load_tokens();
 
+    // SQL migrations for sender stats cache
+    let migrations = vec![
+        // Initial schema
+        tauri_plugin_sql::Migration {
+            version: 1,
+            description: "create sender_stats table",
+            sql: "CREATE TABLE IF NOT EXISTS sender_stats (
+                sender TEXT PRIMARY KEY,
+                count INTEGER NOT NULL,
+                unread_count INTEGER NOT NULL,
+                oldest_id TEXT NOT NULL,
+                newest_id TEXT NOT NULL,
+                sample_subject TEXT NOT NULL,
+                last_updated INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_count ON sender_stats(count DESC);
+            CREATE INDEX IF NOT EXISTS idx_last_updated ON sender_stats(last_updated);",
+            kind: tauri_plugin_sql::MigrationKind::Up,
+        },
+    ];
+
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(
+            tauri_plugin_sql::Builder::default()
+                .add_migrations("sqlite:aisle3.db", migrations)
+                .build(),
+        )
         .manage(AppState {
             gmail_auth: Mutex::new(None),
             auth_tokens: Mutex::new(saved_tokens),
@@ -579,6 +647,7 @@ fn main() {
             get_emails,
             get_inbox_stats,
             get_labels,
+            get_sender_stats,
             check_for_updates,
             install_update,
             start_gmail_auth,
@@ -590,6 +659,7 @@ fn main() {
             check_for_new_emails_since_last_check,
             mark_email_as_read,
             mark_email_as_unread,
+            trash_emails,
             send_reply
         ])
         .run(tauri::generate_context!())

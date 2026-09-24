@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { getCachedSenderStats, cacheSenderStats } from './senderStatsCache.js';
 
 /**
  * Email Service - Centralized email operations and API calls
@@ -190,18 +191,43 @@ export class EmailService {
   async markAsUnread(emailId) {
     try {
       await invoke('mark_email_as_unread', { emailId });
-      
+
       // Update local cache
-      this.emails = this.emails.map(email => 
+      this.emails = this.emails.map(email =>
         email.id === emailId ? { ...email, is_read: false } : email
       );
-      
+
       // Refresh stats
       await this.loadStatsInBackground();
-      
+
       return true;
     } catch (error) {
       console.error('Error marking email as unread:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Trash multiple emails
+   */
+  /**
+   * @param {string[]} emailIds - Array of email IDs to trash
+   */
+  async trashEmails(emailIds) {
+    try {
+      const result = await invoke('trash_emails', { emailIds });
+
+      console.log(`🗑️ Trashed ${emailIds.length} emails`);
+
+      // Update local cache - remove trashed emails
+      this.emails = this.emails.filter(email => !emailIds.includes(email.id));
+
+      // Refresh stats
+      await this.loadStatsInBackground();
+
+      return result;
+    } catch (error) {
+      console.error('Error trashing emails:', error);
       throw error;
     }
   }
@@ -348,6 +374,37 @@ export class EmailService {
       return labels;
     } catch (error) {
       console.error('Error loading labels:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get sender statistics for all emails in inbox
+   * @param {string} [query] - Optional Gmail query string
+   * @param {boolean} [forceRefresh] - Force refresh from Gmail (skip cache)
+   */
+  async getSenderStats(query, forceRefresh = false) {
+    try {
+      // Check cache first unless force refresh
+      if (!forceRefresh) {
+        const cached = await getCachedSenderStats();
+        if (cached) {
+          return cached;
+        }
+      }
+
+      console.log('📊 Fetching sender statistics from Gmail...');
+      const stats = await invoke('get_sender_stats', {
+        query: query || null
+      });
+      console.log(`📊 Received stats for ${stats.length} senders`);
+
+      // Cache the results
+      await cacheSenderStats(stats);
+
+      return stats;
+    } catch (error) {
+      console.error('Error loading sender stats:', error);
       throw error;
     }
   }

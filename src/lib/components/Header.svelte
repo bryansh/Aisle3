@@ -1,7 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import { Button, Badge } from 'flowbite-svelte';
-  import { Mail, ArrowLeft, RotateCw, LogOut, Settings, MessageSquare, Inbox } from 'lucide-svelte';
+  import { Mail, ArrowLeft, RotateCw, LogOut, Settings, MessageSquare, Inbox, Trash2 } from 'lucide-svelte';
 
   // Props
   interface Props {
@@ -14,6 +14,7 @@
     onBackToInbox: () => void;
     onShowSettings: () => void;
     onViewModeToggle: () => void;
+    onShowCleanup: () => void;
   }
 
   let {
@@ -25,7 +26,8 @@
     viewMode = 'emails',
     onBackToInbox,
     onShowSettings,
-    onViewModeToggle
+    onViewModeToggle,
+    onShowCleanup
   }: Props = $props();
 
   // Local state using runes
@@ -71,9 +73,9 @@
       <!-- Controls -->
       <div class="flex gap-3">
         {#if isAuthenticated && !showEmailView && !showSettings}
-          <Button 
-            color="purple" 
-            outline 
+          <Button
+            color="purple"
+            outline
             onclick={onViewModeToggle}
           >
             {#if viewMode === 'emails'}
@@ -84,10 +86,19 @@
               Emails
             {/if}
           </Button>
-          
-          <Button 
-            color="blue" 
-            outline 
+
+          <Button
+            color="orange"
+            outline
+            onclick={onShowCleanup}
+          >
+            <Trash2 class="w-4 h-4 mr-2" />
+            Cleanup
+          </Button>
+
+          <Button
+            color="blue"
+            outline
             onclick={onShowSettings}
           >
             <Settings class="w-4 h-4 mr-2" />

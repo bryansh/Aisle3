@@ -69,14 +69,18 @@ const loadEmailContentWithLoading = createAsyncOperation(loadingEmail);
 const emailCache = new Map();
 
 // Helper to build Gmail query from selected labels
+/**
+ * @param {string[]} labelIds
+ * @param {any[]} labels
+ */
 function buildLabelQuery(labelIds, labels) {
   if (!labelIds || labelIds.length === 0) return null;
 
   // Convert label IDs to names for the query
   // For system labels (INBOX, SENT, etc.), use the ID as-is
   // For custom labels, we need to use the actual name
-  return labelIds.map(id => {
-    const label = labels.find(l => l.id === id);
+  return labelIds.map(/** @param {string} id */ id => {
+    const label = labels.find(/** @param {any} l */ l => l.id === id);
     const labelName = label ? label.name : id;
 
     // If label name has spaces, wrap in quotes
@@ -89,10 +93,13 @@ function buildLabelQuery(labelIds, labels) {
 
 // Email operations
 export const emailOperations = {
+  /**
+   * @param {string | null | undefined} [query]
+   */
   async loadEmails(query) {
     return loadEmailsWithLoading(async () => {
       console.log('📧 loadEmails called with query:', query);
-      const emailData = await emailService.loadEmails(query);
+      const emailData = await emailService.loadEmails(query || undefined);
       console.log('📧 Received emails:', emailData.length, 'emails');
       emails.set(emailData);
 
@@ -104,9 +111,12 @@ export const emailOperations = {
     });
   },
 
+  /**
+   * @param {string | null | undefined} [query]
+   */
   async loadEmailsInBackground(query) {
     try {
-      const emailData = await emailService.loadEmailsInBackground(query);
+      const emailData = await emailService.loadEmailsInBackground(query || undefined);
       emails.set(emailData);
 
       // Cache the results
@@ -287,10 +297,14 @@ export const emailOperations = {
     }
   },
 
+  /**
+   * @param {string} labelId
+   */
   async toggleLabelFilter(labelId) {
     console.log('🏷️ toggleLabelFilter called with:', labelId);
 
     // Update the selected filters
+    /** @type {string[] | undefined} */
     let newFilters;
     selectedLabelFilters.update(filters => {
       if (filters.includes(labelId)) {
@@ -303,13 +317,14 @@ export const emailOperations = {
     });
 
     // Get current labels to build proper query
+    /** @type {any[] | undefined} */
     let currentLabels;
     availableLabels.subscribe(labels => {
       currentLabels = labels;
     })();
 
     // Build query and fetch emails from server
-    const query = buildLabelQuery(newFilters, currentLabels);
+    const query = buildLabelQuery(newFilters || [], currentLabels || []);
     console.log('🔍 Built query:', query);
 
     // Check cache first
@@ -334,6 +349,61 @@ export const emailOperations = {
     } else {
       console.log('🔍 Fetching all emails');
       await this.loadEmails(null);
+    }
+  },
+
+  /**
+   * Trash multiple emails
+   * @param {string[]} emailIds
+   */
+  async trashEmails(emailIds) {
+    try {
+      await emailService.trashEmails(emailIds);
+
+      // Update local state - remove trashed emails
+      emails.update(emailList =>
+        emailList.filter(email => !emailIds.includes(email.id))
+      );
+
+      // Clear cache to force fresh data on next load
+      emailCache.clear();
+
+      return true;
+    } catch (error) {
+      console.error('Error trashing emails:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get sender statistics from ALL emails in inbox (backend analysis)
+   * This analyzes the entire inbox, not just currently loaded emails
+   * @param {string | null | undefined} [query] - Optional Gmail query
+   * @param {boolean} [forceRefresh] - Force refresh from Gmail (skip cache)
+   */
+  async getSenderStats(query, forceRefresh = false) {
+    try {
+      const stats = await emailService.getSenderStats(query || undefined, forceRefresh);
+      return stats;
+    } catch (error) {
+      console.error('Error getting sender stats:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get emails from a specific sender
+   * @param {string} sender - Sender email/name
+   */
+  async getEmailsFromSender(sender) {
+    try {
+      // Build a query to fetch emails from this sender
+      const query = `from:${sender}`;
+      const senderEmails = await emailService.loadEmails(query);
+      return senderEmails;
+    } catch (error) {
+      console.error('Error loading emails from sender:', error);
+      throw error;
     }
   }
 };
