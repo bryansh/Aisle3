@@ -29,7 +29,7 @@
 			from: props.from
 		});
 	}}
-	tippyOptions={{
+	options={{
 		placement: 'top-start'
 	}}
 	class="flex h-fit w-fit items-center gap-1 rounded border bg-background p-1 shadow-lg"

@@ -48,17 +48,9 @@ vi.mock('@tiptap/core', () => ({
 }));
 
 vi.mock('@tiptap/starter-kit', () => ({
-  default: {}
-}));
-
-vi.mock('@tiptap/extension-link', () => ({
   default: {
     configure: () => ({})
   }
-}));
-
-vi.mock('@tiptap/extension-underline', () => ({
-  default: {}
 }));
 
 vi.mock('@tiptap/extension-text-align', () => ({
@@ -67,18 +59,13 @@ vi.mock('@tiptap/extension-text-align', () => ({
   }
 }));
 
-vi.mock('@tiptap/extension-color', () => ({
-  default: {}
-}));
-
+// Tiptap v3: Color, TextStyle and FontFamily ship from @tiptap/extension-text-style
 vi.mock('@tiptap/extension-text-style', () => ({
-  default: {
+  Color: {},
+  TextStyle: {
     configure: () => ({})
-  }
-}));
-
-vi.mock('@tiptap/extension-font-family', () => ({
-  default: {
+  },
+  FontFamily: {
     configure: () => ({})
   }
 }));

@@ -23,12 +23,8 @@
       // Import Tiptap extensions for Gmail-like features
       const { Editor } = await import('@tiptap/core');
       const { default: StarterKit } = await import('@tiptap/starter-kit');
-      const { default: Link } = await import('@tiptap/extension-link');
-      const { default: Underline } = await import('@tiptap/extension-underline');
       const { default: TextAlign } = await import('@tiptap/extension-text-align');
-      const { default: Color } = await import('@tiptap/extension-color');
-      const { default: TextStyle } = await import('@tiptap/extension-text-style');
-      const { default: FontFamily } = await import('@tiptap/extension-font-family');
+      const { Color, TextStyle, FontFamily } = await import('@tiptap/extension-text-style');
       const { Extension } = await import('@tiptap/core');
       
       console.log('Tiptap modules loaded');
@@ -80,13 +76,13 @@
         element: editorElement,
         content: '',
         extensions: [
-          StarterKit,
-          Link.configure({
-            openOnClick: false,
-            autolink: true,
-            defaultProtocol: 'https'
+          StarterKit.configure({
+            link: {
+              openOnClick: false,
+              autolink: true,
+              defaultProtocol: 'https'
+            }
           }),
-          Underline,
           TextAlign.configure({
             types: ['heading', 'paragraph'],
           }),

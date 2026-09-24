@@ -86,32 +86,16 @@
 <BubbleMenu
 	editor={editor as any}
 	class={cn(
-		'edra-bubblemenu flex h-fit w-fit items-center gap-1 rounded-md border bg-background/90 p-0.5 backdrop-blur-md',
+		'edra-bubblemenu flex h-fit w-fit max-w-[calc(100vw-16px)] items-center gap-1 rounded-md border bg-background/90 p-0.5 backdrop-blur-md',
 		className
 	)}
 	{shouldShow}
 	pluginKey="bubble-menu"
 	updateDelay={100}
-	tippyOptions={{
-		popperOptions: {
-			placement: 'top-start',
-			modifiers: [
-				{
-					name: 'preventOverflow',
-					options: {
-						boundary: 'viewport',
-						padding: 8
-					}
-				},
-				{
-					name: 'flip',
-					options: {
-						fallbackPlacements: ['bottom-start', 'top-end', 'bottom-end']
-					}
-				}
-			]
-		},
-		maxWidth: 'calc(100vw - 16px)'
+	options={{
+		placement: 'top-start',
+		shift: { padding: 8 },
+		flip: { fallbackPlacements: ['bottom-start', 'top-end', 'bottom-end'] }
 	}}
 >
 	{#if children}

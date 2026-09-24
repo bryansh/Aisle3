@@ -9,6 +9,14 @@ import type { Component } from 'svelte';
 
 const extensionName = 'slashCommand';
 
+declare module '@tiptap/core' {
+	interface Storage {
+		slashCommand: {
+			rect: Pick<DOMRect, 'width' | 'height' | 'left' | 'top' | 'right' | 'bottom'> | null;
+		};
+	}
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let popup: any;
 

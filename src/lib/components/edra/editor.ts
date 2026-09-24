@@ -1,14 +1,11 @@
 import { Editor, type Content, type EditorOptions, type Extensions } from '@tiptap/core';
-import Color from '@tiptap/extension-color';
-import Link from '@tiptap/extension-link';
 import Subscript from '@tiptap/extension-subscript';
 import Superscript from '@tiptap/extension-superscript';
-import TaskItem from '@tiptap/extension-task-item';
-import TaskList from '@tiptap/extension-task-list';
+import { TaskItem } from '@tiptap/extension-task-item';
+import { TaskList } from '@tiptap/extension-task-list';
 import TextAlign from '@tiptap/extension-text-align';
-import TextStyle from '@tiptap/extension-text-style';
+import { Color, TextStyle } from '@tiptap/extension-text-style';
 import Typography from '@tiptap/extension-typography';
-import Underline from '@tiptap/extension-underline';
 import StarterKit from '@tiptap/starter-kit';
 import Highlight from '@tiptap/extension-highlight';
 import { SmilieReplacer } from './extensions/SmilieReplacer.js';
@@ -17,8 +14,8 @@ import AutoJoiner from 'tiptap-extension-auto-joiner';
 import { MathExtension } from '@aarkue/tiptap-math-extension';
 import { Table, TableCell, TableHeader, TableRow } from './extensions/table/index.js';
 import FontSize from './extensions/FontSize.js';
-import Placeholder from '@tiptap/extension-placeholder';
-import CharacterCount from '@tiptap/extension-character-count';
+import { Placeholder } from '@tiptap/extension-placeholder';
+import { CharacterCount } from '@tiptap/extension-character-count';
 import SearchAndReplace from './extensions/FindAndReplace.js';
 import { getHandlePaste } from './utils.js';
 import { Markdown } from 'tiptap-markdown';
@@ -51,22 +48,21 @@ export const initiateEditor = (
 						class: 'tiptap-heading'
 					}
 				},
-				codeBlock: false
+				codeBlock: false,
+				link: {
+					openOnClick: false,
+					autolink: true,
+					defaultProtocol: 'https',
+					HTMLAttributes: {
+						target: '_blank',
+						rel: 'noopener noreferrer'
+					}
+				}
 			}),
 			SmilieReplacer,
 			ColorHighlighter,
 			Superscript,
 			Subscript,
-			Underline,
-			Link.configure({
-				openOnClick: false,
-				autolink: true,
-				defaultProtocol: 'https',
-				HTMLAttributes: {
-					target: '_blank',
-					rel: 'noopener noreferrer'
-				}
-			}),
 			TaskList,
 			TaskItem.configure({
 				nested: true
