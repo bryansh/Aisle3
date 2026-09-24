@@ -18,9 +18,13 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{js,ts}'],
     exclude: ['src/tests/playwright/**', 'src/tests/visual/**', 'src/tests/performance/**'],
     coverage: {
-      reporter: ['text', 'json', 'html'],
+      reporter: ['text', 'json', 'html', 'lcov'],
+      // Vitest 4 removed coverage.all, so list source files explicitly to keep
+      // untested files in the report
+      include: ['src/**/*.{js,ts,svelte}'],
       exclude: [
         'node_modules/',
+        'src/tests/**',
         'src/setupTests.js',
         '**/*.spec.js',
         '**/*.test.js'

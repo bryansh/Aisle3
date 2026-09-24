@@ -13,20 +13,26 @@ import {
 } from '../../lib/utils/performanceOptimizations.js';
 
 // Mock DOM APIs
-global.IntersectionObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-  disconnect: vi.fn()
-}));
+global.IntersectionObserver = vi.fn().mockImplementation(function () {
+  return {
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn()
+  };
+});
 
-global.MutationObserver = vi.fn().mockImplementation(() => ({
-  observe: vi.fn(),
-  disconnect: vi.fn()
-}));
+global.MutationObserver = vi.fn().mockImplementation(function () {
+  return {
+    observe: vi.fn(),
+    disconnect: vi.fn()
+  };
+});
 
-global.WeakRef = vi.fn().mockImplementation((obj) => ({
-  deref: vi.fn().mockReturnValue(obj)
-}));
+global.WeakRef = vi.fn().mockImplementation(function (obj) {
+  return {
+    deref: vi.fn().mockReturnValue(obj)
+  };
+});
 
 global.requestAnimationFrame = vi.fn((cb) => setTimeout(cb, 16));
 global.Image = vi.fn().mockImplementation(() => ({
