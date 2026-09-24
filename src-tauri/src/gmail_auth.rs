@@ -1,9 +1,8 @@
 use oauth2::basic::BasicClient;
-use oauth2::reqwest::async_http_client;
 use oauth2::RefreshToken;
 use oauth2::{
-    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope,
-    TokenResponse, TokenUrl,
+    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointNotSet, EndpointSet,
+    RedirectUrl, Scope, TokenResponse, TokenUrl,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -18,9 +17,14 @@ pub struct AuthTokens {
     pub expires_in: Option<u64>,
 }
 
+// BasicClient with the auth URL and token URL configured
+type ConfiguredClient =
+    BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet>;
+
 #[derive(Clone)]
 pub struct GmailAuth {
-    client: BasicClient,
+    client: ConfiguredClient,
+    http_client: reqwest::Client,
     csrf_token: Option<CsrfToken>,
 }
 
@@ -28,16 +32,20 @@ impl GmailAuth {
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let credentials = GoogleCredentials::from_env()?;
 
-        let client = BasicClient::new(
-            ClientId::new(credentials.installed.client_id),
-            Some(ClientSecret::new(credentials.installed.client_secret)),
-            AuthUrl::new(credentials.installed.auth_uri)?,
-            Some(TokenUrl::new(credentials.installed.token_uri)?),
-        )
-        .set_redirect_uri(RedirectUrl::new(REDIRECT_URI.to_string())?);
+        let client = BasicClient::new(ClientId::new(credentials.installed.client_id))
+            .set_client_secret(ClientSecret::new(credentials.installed.client_secret))
+            .set_auth_uri(AuthUrl::new(credentials.installed.auth_uri)?)
+            .set_token_uri(TokenUrl::new(credentials.installed.token_uri)?)
+            .set_redirect_uri(RedirectUrl::new(REDIRECT_URI.to_string())?);
+
+        // Don't follow redirects on token requests (oauth2 recommends this to avoid SSRF)
+        let http_client = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()?;
 
         Ok(GmailAuth {
             client,
+            http_client,
             csrf_token: None,
         })
     }
@@ -63,7 +71,7 @@ impl GmailAuth {
         let token_result = self
             .client
             .exchange_code(AuthorizationCode::new(code.to_string()))
-            .request_async(async_http_client)
+            .request_async(&self.http_client)
             .await?;
 
         let access_token = token_result.access_token().secret().clone();
@@ -84,7 +92,7 @@ impl GmailAuth {
         let token_result = self
             .client
             .exchange_refresh_token(&RefreshToken::new(refresh_token.to_string()))
-            .request_async(async_http_client)
+            .request_async(&self.http_client)
             .await?;
 
         let access_token = token_result.access_token().secret().clone();

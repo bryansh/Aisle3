@@ -1,0 +1,9 @@
+[advisories]
+ignore = [
+    # rsa: Marvin timing attack, no patched version exists.
+    # It's only in Cargo.lock because sqlx-macros-core lists sqlx-mysql as an
+    # optional dep, and lockfiles record optional deps even when unused. We only
+    # enable sqlite (via tauri-plugin-sql), so sqlx-mysql and rsa never get
+    # compiled into the app (`cargo tree -i rsa` is empty).
+    "RUSTSEC-2023-0071",
+]
