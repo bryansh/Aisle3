@@ -608,9 +608,7 @@ impl GmailClient {
         // Now fetch messages in batches to get sender info
         // We'll process in chunks of 50 (smaller batches to avoid rate limits)
         let mut sender_map: HashMap<String, SenderStats> = HashMap::new();
-        let mut batch_count = 0;
-
-        for chunk in all_message_refs.chunks(50) {
+        for (batch_count, chunk) in all_message_refs.chunks(50).enumerate() {
             let message_ids: Vec<String> = chunk.iter().map(|m| m.id.clone()).collect();
 
             // Add delay between batches to respect rate limits
@@ -620,7 +618,6 @@ impl GmailClient {
             }
 
             let messages = self.get_messages_batch(&message_ids).await?;
-            batch_count += 1;
 
             for msg in messages {
                 let sender = msg.get_from();
@@ -659,8 +656,8 @@ impl GmailClient {
 
         // Convert to sorted JSON array
         let mut sender_stats: Vec<serde_json::Value> = sender_map
-            .into_iter()
-            .map(|(_, stats)| {
+            .into_values()
+            .map(|stats| {
                 serde_json::json!({
                     "sender": stats.sender,
                     "count": stats.count,

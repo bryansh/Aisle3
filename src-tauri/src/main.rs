@@ -86,7 +86,10 @@ async fn install_update(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn get_emails(state: State<'_, AppState>, query: Option<String>) -> Result<Vec<Email>, String> {
+async fn get_emails(
+    state: State<'_, AppState>,
+    query: Option<String>,
+) -> Result<Vec<Email>, String> {
     // Check rate limit
     state.rate_limiter.check_rate_limit("get_emails")?;
     // This will either return valid tokens or an error

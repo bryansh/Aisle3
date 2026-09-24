@@ -32,7 +32,7 @@ describe('EmailService', () => {
 
       const result = await emailService.loadEmails();
 
-      expect(invoke).toHaveBeenCalledWith('get_emails');
+      expect(invoke).toHaveBeenCalledWith('get_emails', { query: null });
       expect(result).toEqual(mockEmails);
     });
 
@@ -41,7 +41,7 @@ describe('EmailService', () => {
       invoke.mockRejectedValue(error);
 
       await expect(emailService.loadEmails()).rejects.toThrow('Failed to load');
-      expect(invoke).toHaveBeenCalledWith('get_emails');
+      expect(invoke).toHaveBeenCalledWith('get_emails', { query: null });
     });
   });
 

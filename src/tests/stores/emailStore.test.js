@@ -85,7 +85,7 @@ describe('EmailStore', () => {
 
       expect(get(emails)).toEqual(mockEmails);
       expect(get(loading)).toBe(false);
-      expect(invoke).toHaveBeenCalledWith('get_emails');
+      expect(invoke).toHaveBeenCalledWith('get_emails', { query: null });
     });
 
     it('handles email loading error', async () => {

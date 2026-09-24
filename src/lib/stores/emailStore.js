@@ -100,7 +100,7 @@ export const emailOperations = {
     return loadEmailsWithLoading(async () => {
       console.log('📧 loadEmails called with query:', query);
       const emailData = await emailService.loadEmails(query || undefined);
-      console.log('📧 Received emails:', emailData.length, 'emails');
+      console.log('📧 Received emails:', emailData?.length ?? 0, 'emails');
       emails.set(emailData);
 
       // Cache the results
