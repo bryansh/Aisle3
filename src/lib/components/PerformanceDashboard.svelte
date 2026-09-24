@@ -29,7 +29,7 @@
     isMonitoring: false
   });
 
-  let updateInterval: number | null = null;
+  let updateInterval: ReturnType<typeof setInterval> | null = null;
 
   // Update performance data
   const updatePerformanceData = () => {

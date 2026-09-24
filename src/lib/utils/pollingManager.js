@@ -16,7 +16,7 @@
 /**
  * @typedef {Object} PollingState
  * @property {boolean} isRunning - Whether polling is currently active
- * @property {number | null} intervalId - Current interval ID
+ * @property {ReturnType<typeof setInterval> | null} intervalId - Current interval ID
  * @property {number} intervalSeconds - Current interval in seconds
  * @property {number} runCount - Number of times polling has run
  * @property {number | null} lastRunTime - Timestamp of last run
@@ -289,7 +289,7 @@ export class PollingManager {
 
     this.#updateState({
       isRunning: true,
-      intervalId: /** @type {number} */ (intervalId),
+      intervalId,
       intervalSeconds: this.#config.intervalSeconds
     });
 

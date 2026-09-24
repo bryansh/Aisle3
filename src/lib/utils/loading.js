@@ -126,7 +126,7 @@ export function createAsyncOperationWithId(loadingHelper, id) {
  */
 export function createDebouncedLoadingState(delay = 200) {
   const state = writable(false);
-  /** @type {number | null} */ let timeoutId = null;
+  /** @type {ReturnType<typeof setTimeout> | null} */ let timeoutId = null;
   
   return {
     store: state,
